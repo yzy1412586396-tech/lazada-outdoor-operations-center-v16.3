@@ -13,6 +13,7 @@
 | scripts/restore-release.ps1 | 下载分片、还原两个文件并校验 SHA-256 |
 | docs/FUNCTIONS.md | 按模块整理的功能、输入输出和注意事项 |
 | docs/PROVENANCE.md | 来源、哈希、版本差异及数据边界 |
+| docs/SECURITY_REVIEW.md | 原版安全审查发现及修复要求 |
 
 ## 使用与限制
 
@@ -21,3 +22,5 @@ Windows 用户可运行 scripts/restore-release.ps1 下载 Release 分片，还�
 程序将业务数据保存在本机 Electron userData 下；仓库不包含 SQLite 数据库、备份、导入的 Excel、下载文件、聊天记录或 API 凭据。更多细节见 [来源与边界](docs/PROVENANCE.md)。
 
 提取出的 V16.3 运行时清单标记为 UNLICENSED；本私人仓库没有附加开源许可。
+
+**安全审查：**当前原版代码有两项未修复的 P1 问题，涉及本机只读接口访问控制和自动化文件夹授权。详情见 [安全审查记录](docs/SECURITY_REVIEW.md)。本 PR 保持草稿，等待后续修复版本。
