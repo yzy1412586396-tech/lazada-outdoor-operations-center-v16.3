@@ -17,4 +17,4 @@ V16.3更新包_单机稳定版/app.asar 的 SHA-256 是 AE373F64CA83233A3CACB456
 
 主进程将用户数据定位于 Electron userData，包括 data/operations.db、backups/ 和 security/。这些位置可能存放店铺、SKU、价格、导入文件、操作历史、AI 对话及加密凭据。它们没有复制到仓库或 Release。仓库也不收录 D:\lazada运营工具 中的其他项目、历史构建、Excel 或个人图片。
 
-artifacts/app.asar 是应用程序代码归档，不是用户数据库。Release 中的安装器是供安装使用的二进制文件；源代码结构应查看本仓库的 app/ 与 electron/。
+Release 附件 app.asar 是应用程序代码归档，不是用户数据库。Release 中的安装器是供安装使用的二进制文件；源代码结构应查看本仓库的 app/ 与 electron/。

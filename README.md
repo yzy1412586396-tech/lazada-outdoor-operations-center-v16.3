@@ -1,6 +1,6 @@
 # Lazada 户外运营中心 V16.3
 
-本仓库保存当前在本机运行的 **V16.3.0 单机版**程序代码及功能批注。app/ 和 electron/ 从运行中的 app.asar 提取；artifacts/app.asar 是同一文件的原始副本。完整 Windows 安装包作为本仓库的 GitHub Release 附件提供。
+本仓库保存当前在本机运行的 **V16.3.0 单机版**程序代码及功能批注。app/ 和 electron/ 从运行中的 app.asar 提取；原始 app.asar 与完整 Windows 安装包作为本仓库的 GitHub Release 附件提供。
 
 ## 内容
 
@@ -9,7 +9,7 @@
 | app/ | 页面、业务逻辑、库存识别、日报费用、AI 分析界面与样式 |
 | electron/ | Electron 主进程、IPC、SQLite、下载、安全存储与只读接口 |
 | package.json | 安装包内的原始运行时清单，版本为 16.3.0 |
-| artifacts/app.asar | 当前已安装程序的完整应用归档，可用于校验及恢复 |
+| Release 附件 app.asar | 当前已安装程序的完整应用归档，可用于校验及恢复 |
 | docs/FUNCTIONS.md | 按模块整理的功能、输入输出和注意事项 |
 | docs/PROVENANCE.md | 来源、哈希、版本差异及数据边界 |
 
