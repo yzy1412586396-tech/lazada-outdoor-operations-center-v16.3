@@ -1,0 +1,11 @@
+{
+  "name": "lazada-outdoor-operations-center",
+  "version": "16.3.0",
+  "description": "Lazada户外运营中心 Windows桌面版",
+  "main": "electron/main.js",
+  "author": {
+    "name": "Lazada户外运营中心"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}

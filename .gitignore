@@ -1,0 +1,20 @@
+# 运行数据、凭据和用户导入文件不进入源码仓库
+data/
+backups/
+security/
+downloads/
+uploads/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.xlsx
+*.xlsm
+*.csv
+*.env
+*.env.*
+node_modules/
+dist/
+win-unpacked/
+*.exe
+*.zip
