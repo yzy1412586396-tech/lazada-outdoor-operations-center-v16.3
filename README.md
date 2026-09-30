@@ -19,4 +19,4 @@ Windows 用户从 Release 下载 Lazada户外运营中心_安装版_V16.3.0_x64.
 
 程序将业务数据保存在本机 Electron userData 下；仓库不包含 SQLite 数据库、备份、导入的 Excel、下载文件、聊天记录或 API 凭据。更多细节见 [来源与边界](docs/PROVENANCE.md)。
 
-提取出的 V16.3 运行时清单没有 license 字段；本私人仓库没有附加开源许可。
+提取出的 V16.3 运行时清单标记为 UNLICENSED；本私人仓库没有附加开源许可。
