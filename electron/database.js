@@ -23,6 +23,7 @@ const LEGACY_KEYS = new Set([
   'lazadaOpsStandaloneV2',
   'lazadaOpsPhilippinesSystemV8',
   'lazadaOpsThailandSystemV8',
+  'lazadaOpsMalaysiaSystemV8',
   'lazadaInventoryConfigV13',
   'lazadaInventoryPresaleV12',
 ]);
@@ -136,6 +137,7 @@ class OperationsDatabase {
     this._runMigrations(current);
     this._seedDimensions();
     this._ensureDailyBackup();
+    this._archiveStorageChanges(this.db.prepare("SELECT key,value FROM browser_storage").all().map(row=>[row.key,row.value]),nowIso());
   }
 
   _schemaVersion() {
@@ -179,6 +181,7 @@ class OperationsDatabase {
     `);
     upsert.run('country-ph', 'ph', '菲律宾', 1, now, now);
     upsert.run('country-th', 'th', '泰国', 1, now, now);
+    upsert.run('country-my', 'my', '马来西亚', 1, now, now);
   }
 
   _ensureDailyBackup() {
@@ -273,10 +276,10 @@ class OperationsDatabase {
       this.transaction(() => {
         for (const [key, value] of relevant) {
           const sourceHash = hash(value);
-          if (this.getMeta(`snapshot_hash:${key}`) === sourceHash) continue;
+          if (this.getMeta(`snapshot_hash:pricing-scoped-v2:${key}`) === sourceHash) continue;
           const payload = parseJson(value);
           if (payload && typeof payload === 'object') this._archiveLegacyPayload(key, payload, sourceHash, createdAt, false);
-          this.setMeta(`snapshot_hash:${key}`, sourceHash);
+          this.setMeta(`snapshot_hash:pricing-scoped-v2:${key}`, sourceHash);
         }
       });
     } catch (error) {
@@ -286,6 +289,7 @@ class OperationsDatabase {
 
   _countryFromKey(key) {
     if (/Thailand/i.test(key)) return 'th';
+    if (/Malaysia/i.test(key)) return 'my';
     return 'ph';
   }
 
@@ -343,14 +347,20 @@ class OperationsDatabase {
       });
     }
 
-    if (Array.isArray(state.controlRecords) && state.controlRecords.length) {
-      const payloadJson = json({ records: state.controlRecords, conflicts: state.controlConflicts || [], metadata: state.controlMetaByLibrary || state.controlMeta || {} });
-      const dedupeHash = hash(`control|${countryCode}|${payloadJson}`);
-      this.db.prepare(`
-        INSERT OR IGNORE INTO rule_versions(
-          id,country_code,store_id,business_database_id,module,version_no,title,rules_json,source,dedupe_hash,created_at,updated_at
-        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
-      `).run(makeId('rule'), countryCode, null, null, 'control_price', 1, '控价数据库快照', payloadJson, migration ? 'legacy_migration' : 'deterministic_storage_sync', dedupeHash, createdAt, createdAt);
+    // V17.0：按国家和数据库单独归档；选择单库不能包含同国家的其他控价。
+    // 老版没有 database_id 的全量快照，不可直接当作某个本土/跨境库的历史。
+    // Archive each price database separately so context selection cannot include sibling prices.
+    for (const item of databases) {
+      const records=(state.controlRecords||[]).filter(r=>(r.database_id||databases[0]?.id)===item.id);
+      const conflicts=(state.controlConflicts||[]).filter(r=>(r.database_id||databases[0]?.id)===item.id);
+      if (!records.length && !conflicts.length) continue;
+      const metadata=Object.fromEntries(Object.entries(state.controlMetaByLibrary||{}).filter(([key])=>key.startsWith(item.id+'|')));
+      const payloadJson=json({records,conflicts,metadata});
+      const dedupeHash=hash(`control|${countryCode}|${item.id}|${payloadJson}`);
+      this.db.prepare(`INSERT OR IGNORE INTO rule_versions(
+        id,country_code,store_id,business_database_id,module,version_no,title,rules_json,source,dedupe_hash,created_at,updated_at
+      ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).run(makeId('rule'),countryCode,null,databaseIds.get(String(item.id)),
+        'control_price',1,`${item.name}控价快照`,payloadJson,migration?'legacy_migration':'deterministic_storage_sync',dedupeHash,createdAt,createdAt);
     }
 
     const productMaps = state.storeProducts && typeof state.storeProducts === 'object' ? state.storeProducts : {};
@@ -375,7 +385,7 @@ class OperationsDatabase {
         INSERT OR IGNORE INTO operation_logs(
           id,country_code,store_id,business_database_id,module,action,status,summary,payload_json,dedupe_hash,created_at,updated_at
         ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
-      `).run(makeId('op'), countryCode, null, null, module, String(item.type || 'business_operation'), Number(item.success || 0) > 0 ? 'success' : 'recorded', String(item.taskName || item.storeName || ''), payloadJson, dedupeHash, String(item.at || createdAt), String(item.at || createdAt));
+      `).run(makeId('op'), countryCode, storeIds.get(String(item.storeId))||null, databaseIds.get(String(item.databaseId))||null, module, String(item.type || 'business_operation'), Number(item.success || 0) > 0 ? 'success' : 'recorded', String(item.taskName || item.storeName || ''), payloadJson, dedupeHash, String(item.at || createdAt), String(item.at || createdAt));
       if (module !== 'operation') {
         this._insertHistory(HISTORY_TABLES[module], {
           id: makeId(module), countryCode, storeId: '', databaseId: '', businessDate: String(item.at || createdAt).slice(0, 10),
@@ -675,7 +685,7 @@ class OperationsDatabase {
     const dateEnd = String(filters.dateEnd || '');
     if (countryCode) { conditions.push('country_code=?'); params.push(countryCode); }
     if (storeId) { conditions.push('(store_id=? OR store_id IS NULL)'); params.push(storeId); }
-    if (databaseId) { conditions.push('(business_database_id=? OR business_database_id IS NULL)'); params.push(databaseId); }
+    if (databaseId) { conditions.push('business_database_id=?'); params.push(databaseId); }
     if (dateStart) { conditions.push('substr(created_at,1,10)>=?'); params.push(dateStart); }
     if (dateEnd) { conditions.push('substr(created_at,1,10)<=?'); params.push(dateEnd); }
     this._appendHistoryPayloadFilters('control_price', filters, conditions, params);

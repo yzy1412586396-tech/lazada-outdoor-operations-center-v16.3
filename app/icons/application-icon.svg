@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1254 1254">
+  <defs><clipPath id="mac-app-silhouette"><rect x="74" y="74" width="1106" height="1106" rx="244" ry="244"/></clipPath></defs>
+  <!-- Packaging silhouette only. The source artwork is embedded unchanged. -->
+  <image href="../logo.png" width="1254" height="1254" clip-path="url(#mac-app-silhouette)"/>
+</svg>

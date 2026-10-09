@@ -1,11 +1,65 @@
 {
   "name": "lazada-outdoor-operations-center",
-  "version": "16.3.0",
-  "description": "Lazada户外运营中心 Windows桌面版",
+  "version": "17.0.0",
+  "description": "Lazada户外运营中心桌面版",
   "main": "electron/main.js",
   "author": {
     "name": "Lazada户外运营中心"
   },
   "license": "UNLICENSED",
-  "private": true
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "node scripts/build-windows.cjs"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "electron": "44.5.0",
+    "electron-builder": "26.0.12",
+    "pe-library": "^2.0.1",
+    "resedit": "^3.1.0"
+  },
+  "build": {
+    "appId": "com.lazada.outdoor.operations",
+    "productName": "Lazada户外运营中心",
+    "asar": true,
+    "files": [
+      "app/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false,
+      "artifactName": "Lazada-Operations-Center-17.0-Setup-x64.${ext}",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Lazada户外运营中心",
+      "installerLanguages": [
+        "zh_CN",
+        "en_US"
+      ]
+    },
+    "afterPack": "./scripts/update-windows-resources.cjs",
+    "mac": {
+      "icon": "build/icon.icns"
+    }
+  }
 }

@@ -1,6 +1,7 @@
-const { app, BrowserWindow, Menu, dialog, shell, session, ipcMain, safeStorage, clipboard, nativeImage } = require('electron');
+const { app, BrowserWindow, Menu, dialog, shell, session, ipcMain, safeStorage, clipboard, nativeImage, screen } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const { installWindowsSurface, fitBoundsToWorkArea } = require('./window-surface');
 const { OperationsDatabase } = require('./database');
 const { ContextBuilder } = require('./services/context-builder');
 const { CredentialStore } = require('./services/credential-store');
@@ -11,8 +12,8 @@ const { registerAutomationFolderHandlers } = require('./automation-folders');
 const { NorthstarReadOnlyServer } = require('./northstar-server');
 
 const APP_NAME = 'Lazada户外运营中心';
-const APP_VERSION = '16.3.0';
-const DISPLAY_VERSION = '16.3';
+const APP_VERSION = '17.0.0';
+const DISPLAY_VERSION = '17.0';
 const TRANSPARENT_DRAG_ICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 const isSmokeTest = process.argv.includes('--smoke-test');
 const isRealInventoryTest = process.argv.includes('--real-inventory-test');
@@ -86,8 +87,9 @@ function readWindowState() {
 
 function writeWindowState(win) {
   if (!win || win.isDestroyed() || isSmokeTest) return;
-  const bounds = win.isMaximized() ? win.getNormalBounds() : win.getBounds();
-  const payload = { ...bounds, maximized: win.isMaximized() };
+  const maximized = win.windowsSurface ? win.windowsSurface.isMaximized() : win.isMaximized();
+  const bounds = win.windowsSurface ? win.windowsSurface.getNormalBounds() : (maximized ? win.getNormalBounds() : win.getBounds());
+  const payload = { ...bounds, maximized };
   try {
     fs.mkdirSync(app.getPath('userData'), { recursive: true });
     fs.writeFileSync(stateFile(), JSON.stringify(payload, null, 2), 'utf8');
@@ -456,20 +458,23 @@ function registerWindowHandlers() {
   ipcMain.handle('window:minimize', (event) => { getOwnedWindow(event).minimize(); return { ok: true }; });
   ipcMain.handle('window:maximize-toggle', (event) => {
     const win = getOwnedWindow(event);
+    if (win.windowsSurface) return { ok: true, maximized: win.windowsSurface.toggleMaximize() };
     if (win.isMaximized()) win.unmaximize(); else win.maximize();
     return { ok: true, maximized: win.isMaximized() };
   });
   ipcMain.handle('window:close', (event) => { getOwnedWindow(event).close(); return { ok: true }; });
-  ipcMain.on('window:drag-delta', (event, value) => {
+  ipcMain.handle('window:resize-start', (event, edge) => ({ ok: getOwnedWindow(event).windowsSurface?.startResize(edge) || false }));
+  ipcMain.on('window:resize-stop', (event) => { getOwnedWindow(event).windowsSurface?.stopResize(); });
+  ipcMain.handle('window:state', (event) => {
     const win = getOwnedWindow(event);
-    const clampDelta = (input) => Math.max(-200, Math.min(200, Math.round(Number(input) || 0)));
-    const dx = clampDelta(value?.dx);
-    const dy = clampDelta(value?.dy);
-    if (!dx && !dy) return;
-    if (win.isMaximized()) win.unmaximize();
-    const bounds = win.getBounds();
-    win.setPosition(bounds.x + dx, bounds.y + dy, false);
+    return { maximized: win.windowsSurface ? win.windowsSurface.isMaximized() : win.isMaximized() };
   });
+  ipcMain.on('window:surface-ready', (event) => {
+    const win = getOwnedWindow(event);
+    win.surfaceReady = true;
+    if (win.readyForSurface && !isSmokeTest) win.show();
+  });
+
 }
 
 function runUiTest(win) {
@@ -585,20 +590,7 @@ function runUiTest(win) {
       await clickAtSelector('plugins-open', '#v161PluginsButton', () => win.webContents.executeJavaScript(`document.querySelector('#v161PluginsPanel')?.classList.contains('show')`));
       recordStage('click-plugins-close');
       await clickAtSelector('plugins-close', '#v161PluginsButton', () => win.webContents.executeJavaScript(`!document.querySelector('#v161PluginsPanel')?.classList.contains('show')`));
-      recordStage('drag-window');
-      const beforeDrag = win.getBounds();
-      const dragStart = rendererReport.brand.dragPoint;
-      win.webContents.sendInputEvent({ type:'mouseMove', x:dragStart.x, y:dragStart.y, movementX:0, movementY:0 });
-      win.webContents.sendInputEvent({ type:'mouseDown', x:dragStart.x, y:dragStart.y, button:'left', clickCount:1 });
-      for (let step = 1; step <= 6; step += 1) {
-        win.webContents.sendInputEvent({ type:'mouseMove', x:dragStart.x + step * 10, y:dragStart.y + step * 4, movementX:10, movementY:4 });
-        await new Promise((resolve) => setTimeout(resolve, 25));
-      }
-      win.webContents.sendInputEvent({ type:'mouseUp', x:dragStart.x + 60, y:dragStart.y + 24, button:'left', clickCount:1 });
-      await new Promise((resolve) => setTimeout(resolve, 220));
-      const afterDrag = win.getBounds();
-      const dragWorked = Math.abs(afterDrag.x - beforeDrag.x) >= 20 || Math.abs(afterDrag.y - beforeDrag.y) >= 10;
-      if (dragWorked) win.setBounds(beforeDrag);
+      // sendInputEvent cannot synthesize OS-owned window dragging. Validate the native region separately.
       recordStage('click-maximize');
       await clickAtSelector('maximize', '[data-window-action="maximize"]', async () => win.isMaximized());
       const maximizeWorked = win.isMaximized();
@@ -609,11 +601,11 @@ function runUiTest(win) {
       const layoutValid = rendererReport.appTop - (rendererReport.controls[0].top + rendererReport.controls[0].height) === 8 && rendererReport.download.top === rendererReport.controls[0].top && rendererReport.download.height === 34 && rendererReport.download.rightGap === 142 && rendererReport.plugins.top === 10 && rendererReport.plugins.height === 34 && rendererReport.plugins.rightGap === 258;
       const dragLayerValid = rendererReport.chrome.height === 52 && rendererReport.chrome.bottom === 52
         && rendererReport.brand.height === 52 && rendererReport.brand.bottom === 52
-        && rendererReport.brand.pointerEvents === 'auto' && rendererReport.brand.appRegion === 'no-drag'
+        && rendererReport.brand.pointerEvents === 'auto' && rendererReport.brand.appRegion === 'drag'
         && rendererReport.brand.dragPoint.hitClass.includes('v155-window-brand');
       const nativeInputValid = nativeClicks.every((item) => item.passed && item.elapsedMs < 500);
-      const passed = nativeInputValid && controlsValid && alphaRangesDiffer && layoutValid && dragLayerValid && dragWorked && rendererReport.scrollbarWidth === '0px' && maximizeWorked;
-      const report = { ...rendererReport, nativeClicks, dragTest:{before:beforeDrag,after:afterDrag,worked:dragWorked}, maximizeWorked, dragLayerValid, screenshotPath: null, screenshotWarning: null, passed };
+      const passed = nativeInputValid && controlsValid && alphaRangesDiffer && layoutValid && dragLayerValid && rendererReport.scrollbarWidth === '0px' && maximizeWorked;
+      const report = { ...rendererReport, nativeClicks, dragTest:{nativeRegionConfigured:dragLayerValid,movementVerified:false}, maximizeWorked, dragLayerValid, screenshotPath: null, screenshotWarning: null, passed };
       recordStage('capturing-screenshot');
       try {
         win.showInactive();
@@ -1071,7 +1063,7 @@ function runSmokeTest(win) {
       })`);
       const ok = result.title.includes('Lazada') && result.xlsxVersion && result.navItems >= 13 && result.pages >= 13
         && result.dashboard && result.settings && result.inventory && result.desktopBridge
-        && result.databaseReady && result.themeCount === 1 && result.warehouseCount >= 2
+        && result.databaseReady && result.themeCount === 5 && result.warehouseCount >= 2
         && result.spreadsheetInputs > 0 && result.clearButtons + result.inventoryClearButtons >= result.spreadsheetInputs
         && result.expenseInputs > 0 && result.expenseClearButtons >= result.expenseInputs
         && result.inventoryAnalysis && result.inventoryExport && result.inventoryPersistence && result.inventorySkuRules && result.realInventorySample
@@ -1126,21 +1118,28 @@ function runSmokeTest(win) {
 
 function createWindow() {
   const state = readWindowState();
+  const windowsSurface = process.platform === 'win32' || (isPlaywrightTest && process.argv.includes('--surface-renderer-test'));
+  const display = Number.isFinite(state.x) && Number.isFinite(state.y) ? screen.getDisplayMatching(state) : screen.getPrimaryDisplay();
+  const bounds = windowsSurface ? fitBoundsToWorkArea(state, display.workArea) : state;
   const win = new BrowserWindow({
     title: `${APP_NAME} V${DISPLAY_VERSION}`,
-    width: state.width,
-    height: state.height,
-    x: state.x,
-    y: state.y,
-    minWidth: 1100,
-    minHeight: 700,
+    width: bounds.width,
+    height: bounds.height,
+    x: bounds.x,
+    y: bounds.y,
+    minWidth: windowsSurface ? Math.min(1100, display.workArea.width) : 1100,
+    minHeight: windowsSurface ? Math.min(700, display.workArea.height) : 700,
     show: false,
     autoHideMenuBar: true,
-    frame: false,
-    transparent: !isPlaywrightTest,
-    hasShadow: false,
-    backgroundColor: isPlaywrightTest ? '#F1F5F9' : '#00000000',
-    icon: path.join(__dirname, '..', 'build', 'icon.png'),
+    frame: !windowsSurface && process.platform === 'darwin',
+    titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'default',
+    roundedCorners: true,
+    transparent: windowsSurface,
+    resizable: !windowsSurface,
+    maximizable: !windowsSurface,
+    hasShadow: !windowsSurface,
+    backgroundColor: windowsSurface ? '#00000000' : '#F1F5F9',
+    icon: path.join(__dirname, '..', 'app', 'app-icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -1149,9 +1148,12 @@ function createWindow() {
       webSecurity: true,
       allowRunningInsecureContent: false,
       spellcheck: false,
+      additionalArguments: windowsSurface ? ['--windows-surface'] : [],
     },
   });
 
+  if (process.platform === 'darwin') win.setWindowButtonVisibility(false);
+  if (windowsSurface) win.windowsSurface = installWindowsSurface(win, screen);
   mainWindow = win;
   win.webContents.on('render-process-gone', (_event, details) => {
     console.error('RENDER_PROCESS_GONE:', JSON.stringify(details));
@@ -1159,7 +1161,9 @@ function createWindow() {
   win.webContents.on('did-fail-load', (_event, code, description, url, isMainFrame) => {
     console.error('DID_FAIL_LOAD:', JSON.stringify({ code, description, url, isMainFrame }));
   });
-  if (state.maximized && !isSmokeTest && !isUiTest) win.maximize();
+  if (state.maximized && !isSmokeTest && !isUiTest) {
+    if (win.windowsSurface) win.windowsSurface.toggleMaximize(); else win.maximize();
+  }
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url);
@@ -1186,7 +1190,10 @@ function createWindow() {
     runUiTest(win);
     win.once('ready-to-show', () => win.show());
   } else {
-    win.once('ready-to-show', () => win.show());
+    win.once('ready-to-show', () => {
+      if (!win.windowsSurface) win.show();
+      else { win.readyForSurface = true; if (win.surfaceReady) win.show(); }
+    });
   }
 
   win.loadFile(path.join(__dirname, '..', 'app', 'index.html'));
@@ -1201,6 +1208,7 @@ app.on('second-instance', () => {
 });
 
 app.whenReady().then(() => {
+  if (process.platform === 'darwin') app.dock.setIcon(path.join(__dirname, '..', 'app', 'app-icon.png'));
   loadRecentDownloads();
   registerDownloadHandlers();
   registerWindowHandlers();

@@ -1,7 +1,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-const APP_VERSION = '16.3.0';
-const DISPLAY_VERSION = '16.3';
+const APP_VERSION = '17.0.0';
+const DISPLAY_VERSION = '17.0';
+const usesWindowsSurface = process.platform === 'win32' || process.argv.includes('--windows-surface');
 let databaseReady = false;
 let lastStorage = new Map();
 let syncTimer = null;
@@ -233,8 +234,9 @@ contextBridge.exposeInMainWorld('desktopApp', Object.freeze({
 
 function updateDesktopBranding() {
   document.title = `Lazada户外运营中心 V${DISPLAY_VERSION}`;
-  document.documentElement.classList.add('desktop-app');
+  document.documentElement.classList.add('desktop-app', 'desktop-performance');
   document.documentElement.dataset.appVersion = DISPLAY_VERSION;
+  document.documentElement.dataset.desktopPlatform = usesWindowsSurface ? 'win32' : process.platform;
 
   const brandLabel = document.getElementById('brandSystemLabel');
   if (brandLabel) brandLabel.textContent = brandLabel.textContent.replace(/^V\d+(?:\.\d+)?/, `V${DISPLAY_VERSION}`);
@@ -251,11 +253,7 @@ function updateDesktopBranding() {
     brandMark.appendChild(logo);
   }
 
-  const chip = document.querySelector('.local-chip');
-  if (chip) chip.innerHTML = '<i></i>SQLite 自动保存';
 
-  const footText = document.querySelector('.sidebar-foot > div:last-child');
-  if (footText) footText.textContent = '数据和月度费用表格保存在本机数据库中。Excel 不会上传到服务器。';
 }
 
 function installWindowChrome() {
@@ -274,47 +272,7 @@ function installWindowChrome() {
       <button type="button" class="close" data-window-action="close" aria-label="关闭" title="关闭">×</button>
     </div>`;
   document.body.prepend(chrome);
-  const dragSurface = chrome.querySelector('[data-window-drag]');
-  let dragging = false;
-  let lastDragX = 0;
-  let lastDragY = 0;
-  let pendingDragX = 0;
-  let pendingDragY = 0;
-  let dragFrame = 0;
-  const flushDrag = () => {
-    dragFrame = 0;
-    const dx = Math.round(pendingDragX);
-    const dy = Math.round(pendingDragY);
-    pendingDragX = 0;
-    pendingDragY = 0;
-    if (dx || dy) ipcRenderer.send('window:drag-delta', { dx, dy });
-  };
-  const finishDrag = () => {
-    if (!dragging) return;
-    dragging = false;
-    if (dragFrame) cancelAnimationFrame(dragFrame);
-    flushDrag();
-  };
-  dragSurface.addEventListener('mousedown', (event) => {
-    if (event.button !== 0) return;
-    dragging = true;
-    lastDragX = event.clientX;
-    lastDragY = event.clientY;
-    pendingDragX = 0;
-    pendingDragY = 0;
-    event.preventDefault();
-  });
-  window.addEventListener('mousemove', (event) => {
-    if (!dragging) return;
-    pendingDragX += event.clientX - lastDragX;
-    pendingDragY += event.clientY - lastDragY;
-    lastDragX = event.clientX;
-    lastDragY = event.clientY;
-    if (!dragFrame) dragFrame = requestAnimationFrame(flushDrag);
-    event.preventDefault();
-  }, true);
-  window.addEventListener('mouseup', finishDrag, true);
-  window.addEventListener('blur', finishDrag);
+  // Native app-region dragging avoids client-coordinate feedback as the window moves.
   chrome.querySelector('[data-window-action="minimize"]').addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -330,17 +288,69 @@ function installWindowChrome() {
     event.stopPropagation();
     void ipcRenderer.invoke('window:close');
   });
+  if (usesWindowsSurface) {
+    let activeHandle = null;
+    const stop = () => {
+      if (!activeHandle) return;
+      activeHandle = null;
+      ipcRenderer.send('window:resize-stop');
+    };
+    for (const edge of ['n','s','e','w','ne','nw','se','sw']) {
+      const handle = document.createElement('div');
+      handle.className = `window-resize-handle edge-${edge}`;
+      handle.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        handle.setPointerCapture(event.pointerId);
+        activeHandle = handle;
+        void ipcRenderer.invoke('window:resize-start', edge);
+      });
+      handle.addEventListener('pointerup', stop);
+      handle.addEventListener('pointercancel', stop);
+      handle.addEventListener('lostpointercapture', stop);
+      document.body.appendChild(handle);
+    }
+    window.addEventListener('blur', stop);
+    const updateState = (state) => {
+      document.documentElement.dataset.windowMaximized = String(!!state.maximized);
+      chrome.querySelector('[data-window-action="maximize"]').setAttribute('aria-label', state.maximized ? '还原' : '最大化');
+    };
+    ipcRenderer.on('window:surface-state', (_event, state) => updateState(state));
+    void ipcRenderer.invoke('window:state').then(updateState);
+  }
+}
+
+function installWindowSurface() {
+  if (!usesWindowsSurface) return;
+  const surface = document.createElement('div');
+  surface.id = 'desktopWindowSurface';
+  // A body background can propagate to the root canvas and bypass body clipping.
+  // Keep body/root transparent and paint every visible node in this fixed surface.
+  const moveIntoSurface = (node) => {
+    if (node !== surface && !(node.nodeType === 1 && /^(SCRIPT|STYLE|LINK)$/.test(node.tagName))) surface.appendChild(node);
+  };
+  [...document.body.childNodes].forEach(moveIntoSurface);
+  document.body.appendChild(surface);
+  const observer = new MutationObserver((changes) => {
+    for (const change of changes) for (const node of change.addedNodes) {
+      if (node.parentNode === document.body) moveIntoSurface(node);
+    }
+  });
+  observer.observe(document.body, { childList: true });
 }
 
 async function injectDesktopAssets() {
-  for (const href of ['./desktop-enhancements.css', './inventory-v15.css', './ai-observer.css']) {
+  const stylesReady = [];
+  for (const href of ['./desktop-enhancements.css', './inventory-v15.css', './ai-observer.css', './themes.css']) {
     const style = document.createElement('link');
     style.rel = 'stylesheet';
     style.href = href;
+    stylesReady.push(new Promise((resolve, reject) => { style.onload = resolve; style.onerror = () => reject(new Error(`无法加载 ${href}`)); }));
     document.head.appendChild(style);
   }
+  await Promise.all(stylesReady);
 
-  for (const source of ['./desktop-enhancements.js', './inventory-engine-v15.js', './inventory-v15.js', './business-optimizations-v14.js', './ai-observer.js']) {
+  for (const source of ['./desktop-enhancements.js', './inventory-engine-v15.js', './inventory-v15.js', './business-optimizations-v14.js', './ai-observer.js', './themes-runtime.js']) {
     await new Promise((resolve, reject) => {
       const script = document.createElement('script');
       script.src = source;
@@ -365,7 +375,8 @@ ipcRenderer.on('desktop-command', (_event, command) => {
 window.addEventListener('DOMContentLoaded', () => {
   updateDesktopBranding();
   installWindowChrome();
-  injectDesktopAssets().catch((error) => console.error(error));
+  installWindowSurface();
+  injectDesktopAssets().then(() => { if (usesWindowsSurface) ipcRenderer.send('window:surface-ready'); }).catch((error) => console.error(error));
   document.addEventListener('change', () => scheduleSync(250), true);
   document.addEventListener('input', () => scheduleSync(900), true);
   setInterval(syncStorage, 1500);

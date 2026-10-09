@@ -280,3 +280,9 @@ html.desktop-app .panel,html.desktop-app .expense-page,html.desktop-app .expense
 html.desktop-app [data-page="ai-observer"],
 html.desktop-app #page-ai-observer,
 html.desktop-app .v15-feature-disabled{display:none!important;visibility:hidden!important;pointer-events:none!important}
+
+/* V16.4: opaque compositor and OS-owned dragging on macOS and Windows. */
+html.desktop-app,html.desktop-app body{background:#f1f5f9!important}
+html.desktop-app.desktop-performance[data-theme][data-effects] *,html.desktop-app.desktop-performance[data-theme][data-effects] *::before,html.desktop-app.desktop-performance[data-theme][data-effects] *::after{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+html.desktop-app .v155-window-brand{-webkit-app-region:drag!important;app-region:drag!important;cursor:default!important;user-select:none}
+html.desktop-app .v155-window-actions,html.desktop-app .v155-window-actions button,html.desktop-app #v152DownloadsButton{-webkit-app-region:no-drag!important}

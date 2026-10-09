@@ -1,0 +1,493 @@
+{
+  "version": "17.0",
+  "windows10NativeVisualTested": false,
+  "candidateTrialAuthorized": true,
+  "threeCountriesTwoDatabases": {
+    "ok": true,
+    "result": {
+      "ph": {
+        "records": [
+          {
+            "sku": "T1234567890",
+            "product_name_cn": "测试普通商品",
+            "category1": "",
+            "category2": "",
+            "category3": "",
+            "control_type": "",
+            "product_class": "",
+            "la_price": 111,
+            "regular_price": 112,
+            "campaign_price": 113,
+            "is_pool": 0,
+            "is_battery": 0,
+            "is_combo": 0,
+            "is_forbidden": 0,
+            "library_type": "ordinary",
+            "database_id": "philippines",
+            "source_row": 2
+          },
+          {
+            "sku": "T1234567890",
+            "product_name_cn": "测试普通商品",
+            "category1": "",
+            "category2": "",
+            "category3": "",
+            "control_type": "",
+            "product_class": "",
+            "la_price": 222,
+            "regular_price": 223,
+            "campaign_price": 224,
+            "is_pool": 0,
+            "is_battery": 0,
+            "is_combo": 0,
+            "is_forbidden": 0,
+            "library_type": "ordinary",
+            "database_id": "ph-db-1791430010828",
+            "source_row": 2
+          }
+        ],
+        "conflicts": [],
+        "selections": {
+          "controlDatabase": "ph-db-1791430010828",
+          "controlImportDatabase": "ph-db-1791430010828",
+          "actDatabase": "ph-db-1791430010828",
+          "repDatabase": "philippines"
+        }
+      },
+      "th": {
+        "records": [
+          {
+            "sku": "T1234567890",
+            "product_name_cn": "测试普通商品",
+            "category1": "",
+            "category2": "",
+            "category3": "",
+            "control_type": "",
+            "product_class": "",
+            "la_price": 111,
+            "regular_price": 112,
+            "campaign_price": 113,
+            "is_pool": 0,
+            "is_battery": 0,
+            "is_combo": 0,
+            "is_forbidden": 0,
+            "library_type": "ordinary",
+            "database_id": "thailand",
+            "source_row": 2
+          },
+          {
+            "sku": "T1234567890",
+            "product_name_cn": "测试普通商品",
+            "category1": "",
+            "category2": "",
+            "category3": "",
+            "control_type": "",
+            "product_class": "",
+            "la_price": 222,
+            "regular_price": 223,
+            "campaign_price": 224,
+            "is_pool": 0,
+            "is_battery": 0,
+            "is_combo": 0,
+            "is_forbidden": 0,
+            "library_type": "ordinary",
+            "database_id": "th-db-1791430011843",
+            "source_row": 2
+          }
+        ],
+        "conflicts": [],
+        "selections": {
+          "controlDatabase": "th-db-1791430011843",
+          "controlImportDatabase": "th-db-1791430011843",
+          "actDatabase": "th-db-1791430011843",
+          "repDatabase": "thailand"
+        }
+      },
+      "my": {
+        "records": [
+          {
+            "sku": "T1234567890",
+            "product_name_cn": "测试普通商品",
+            "category1": "",
+            "category2": "",
+            "category3": "",
+            "control_type": "",
+            "product_class": "",
+            "la_price": 111,
+            "regular_price": 112,
+            "campaign_price": 113,
+            "is_pool": 0,
+            "is_battery": 0,
+            "is_combo": 0,
+            "is_forbidden": 0,
+            "library_type": "ordinary",
+            "database_id": "malaysia",
+            "source_row": 2
+          },
+          {
+            "sku": "T1234567890",
+            "product_name_cn": "测试普通商品",
+            "category1": "",
+            "category2": "",
+            "category3": "",
+            "control_type": "",
+            "product_class": "",
+            "la_price": 222,
+            "regular_price": 223,
+            "campaign_price": 224,
+            "is_pool": 0,
+            "is_battery": 0,
+            "is_combo": 0,
+            "is_forbidden": 0,
+            "library_type": "ordinary",
+            "database_id": "my-db-1791430011935",
+            "source_row": 2
+          }
+        ],
+        "conflicts": [],
+        "selections": {
+          "controlDatabase": "my-db-1791430011935",
+          "controlImportDatabase": "my-db-1791430011935",
+          "actDatabase": "my-db-1791430011935",
+          "repDatabase": "malaysia"
+        }
+      }
+    },
+    "reloaded": {
+      "ph": {
+        "selections": {
+          "controlDatabase": "ph-db-1791430010828",
+          "controlImportDatabase": "ph-db-1791430010828",
+          "actDatabase": "ph-db-1791430010828",
+          "repDatabase": "philippines"
+        },
+        "records": [
+          {
+            "sku": "T1234567890",
+            "product_name_cn": "测试普通商品",
+            "category1": "",
+            "category2": "",
+            "category3": "",
+            "control_type": "",
+            "product_class": "",
+            "la_price": 111,
+            "regular_price": 112,
+            "campaign_price": 113,
+            "is_pool": 0,
+            "is_battery": 0,
+            "is_combo": 0,
+            "is_forbidden": 0,
+            "library_type": "ordinary",
+            "database_id": "philippines",
+            "source_row": 2
+          },
+          {
+            "sku": "T1234567890",
+            "product_name_cn": "测试普通商品",
+            "category1": "",
+            "category2": "",
+            "category3": "",
+            "control_type": "",
+            "product_class": "",
+            "la_price": 222,
+            "regular_price": 223,
+            "campaign_price": 224,
+            "is_pool": 0,
+            "is_battery": 0,
+            "is_combo": 0,
+            "is_forbidden": 0,
+            "library_type": "ordinary",
+            "database_id": "ph-db-1791430010828",
+            "source_row": 2
+          }
+        ],
+        "conflicts": []
+      },
+      "th": {
+        "selections": {
+          "controlDatabase": "th-db-1791430011843",
+          "controlImportDatabase": "th-db-1791430011843",
+          "actDatabase": "th-db-1791430011843",
+          "repDatabase": "thailand"
+        },
+        "records": [
+          {
+            "sku": "T1234567890",
+            "product_name_cn": "测试普通商品",
+            "category1": "",
+            "category2": "",
+            "category3": "",
+            "control_type": "",
+            "product_class": "",
+            "la_price": 111,
+            "regular_price": 112,
+            "campaign_price": 113,
+            "is_pool": 0,
+            "is_battery": 0,
+            "is_combo": 0,
+            "is_forbidden": 0,
+            "library_type": "ordinary",
+            "database_id": "thailand",
+            "source_row": 2
+          },
+          {
+            "sku": "T1234567890",
+            "product_name_cn": "测试普通商品",
+            "category1": "",
+            "category2": "",
+            "category3": "",
+            "control_type": "",
+            "product_class": "",
+            "la_price": 222,
+            "regular_price": 223,
+            "campaign_price": 224,
+            "is_pool": 0,
+            "is_battery": 0,
+            "is_combo": 0,
+            "is_forbidden": 0,
+            "library_type": "ordinary",
+            "database_id": "th-db-1791430011843",
+            "source_row": 2
+          }
+        ],
+        "conflicts": []
+      },
+      "my": {
+        "selections": {
+          "controlDatabase": "my-db-1791430011935",
+          "controlImportDatabase": "my-db-1791430011935",
+          "actDatabase": "my-db-1791430011935",
+          "repDatabase": "malaysia"
+        },
+        "records": [
+          {
+            "sku": "T1234567890",
+            "product_name_cn": "测试普通商品",
+            "category1": "",
+            "category2": "",
+            "category3": "",
+            "control_type": "",
+            "product_class": "",
+            "la_price": 111,
+            "regular_price": 112,
+            "campaign_price": 113,
+            "is_pool": 0,
+            "is_battery": 0,
+            "is_combo": 0,
+            "is_forbidden": 0,
+            "library_type": "ordinary",
+            "database_id": "malaysia",
+            "source_row": 2
+          },
+          {
+            "sku": "T1234567890",
+            "product_name_cn": "测试普通商品",
+            "category1": "",
+            "category2": "",
+            "category3": "",
+            "control_type": "",
+            "product_class": "",
+            "la_price": 222,
+            "regular_price": 223,
+            "campaign_price": 224,
+            "is_pool": 0,
+            "is_battery": 0,
+            "is_combo": 0,
+            "is_forbidden": 0,
+            "library_type": "ordinary",
+            "database_id": "my-db-1791430011935",
+            "source_row": 2
+          }
+        ],
+        "conflicts": []
+      }
+    }
+  },
+  "sameSkuIndependentImportsAndActivityPrices": true,
+  "conflictsRestoreClearDeleteCacheAndReloadTested": true,
+  "duringAnalysisSwitchCancelsAndStaleExportBlocked": true,
+  "sqlitePricingScopeTestPassed": true,
+  "installedAsarUiTestPassed": true,
+  "personallyViewedRendererScreenshots": true,
+  "rendererPlatform": "macOS Electron rendering same Windows surface; not Windows desktop capture",
+  "package": {
+    "version": "17.0.0",
+    "displayVersion": "V17.0",
+    "winInstallerAsarMatchesUnpacked": true,
+    "winAndMacMatchFinalSource": true,
+    "filesChecked": [
+      "app/index.html",
+      "app/logo.png",
+      "app/app-icon.png",
+      "app/icons/application-icon.svg",
+      "app/desktop-enhancements.js",
+      "app/desktop-enhancements.css",
+      "app/themes.css",
+      "app/themes-runtime.js",
+      "electron/database.js",
+      "electron/main.js",
+      "electron/preload.js",
+      "electron/window-surface.js",
+      "app/fonts/NotoSansSC.ttf",
+      "app/fonts/NotoSerifSC.ttf"
+    ],
+    "macBundleIconMatches": true,
+    "obsoleteAnnouncementsRemoved": true,
+    "businessInputsOrDatabaseIncluded": false,
+    "windows10NativeVisualTested": false,
+    "windowsStatus": "candidate trial authorized, Windows native verification pending"
+  },
+  "realTemplateRepricingRegression": {
+    "countries": [
+      {
+        "country": "ph",
+        "analysisMs": 174,
+        "patchCount": 3,
+        "blankPrice": 777.25,
+        "comboPrice": 310,
+        "storedRule": false,
+        "edgeCases": 7
+      },
+      {
+        "country": "th",
+        "analysisMs": 159,
+        "patchCount": 3,
+        "blankPrice": 777.25,
+        "comboPrice": 310,
+        "storedRule": false,
+        "edgeCases": 7
+      },
+      {
+        "country": "my",
+        "analysisMs": 160,
+        "patchCount": 3,
+        "blankPrice": 777.25,
+        "comboPrice": 310,
+        "storedRule": false,
+        "edgeCases": 7
+      }
+    ],
+    "exports": [
+      {
+        "name": "ph-protect.xlsx"
+      },
+      {
+        "name": "ph-ignore.xlsx"
+      },
+      {
+        "name": "th-protect.xlsx"
+      },
+      {
+        "name": "th-ignore.xlsx"
+      },
+      {
+        "name": "my-protect.xlsx"
+      },
+      {
+        "name": "my-ignore.xlsx"
+      }
+    ],
+    "source": {
+      "rows": 294,
+      "blank": 294,
+      "comboDefinitions": 4755,
+      "blankSku": "T4EE0202127",
+      "comboSku": "T4EE0201903X9",
+      "comboDefinition": {
+        "comboSku": "T4EE0201903X9",
+        "name": "7Y-铁制蛋卷桌120cm奶绿色（1+克米特户外折叠椅XL大号奶绿色*2）",
+        "components": [
+          {
+            "sku": "T4EE1311915",
+            "quantity": 2
+          },
+          {
+            "sku": "T4EE0201903",
+            "quantity": 1
+          }
+        ],
+        "sourceRow": 2280
+      }
+    },
+    "drag": {
+      "native": "drag",
+      "blur": "none"
+    },
+    "release": {
+      "version": "V17.0",
+      "latestFirst": true
+    },
+    "ok": true,
+    "reload": {
+      "ph": "protect",
+      "th": "ignore",
+      "ok": true
+    },
+    "resize": {
+      "opaque": true,
+      "sizesChecked": 5
+    }
+  },
+  "macPackagedSmoke": {
+    "title": "Lazada户外运营中心 V17.0",
+    "xlsxVersion": "0.18.5",
+    "navItems": 13,
+    "pages": 14,
+    "dashboard": true,
+    "settings": true,
+    "inventory": true,
+    "desktopBridge": true,
+    "databaseReady": true,
+    "themeCount": 5,
+    "warehouseCount": 2,
+    "spreadsheetInputs": 21,
+    "clearButtons": 18,
+    "inventoryClearButtons": 3,
+    "expenseInputs": 12,
+    "expenseClearButtons": 12,
+    "expenseBridge": true,
+    "databasePanel": true,
+    "aiObserver": true,
+    "aiTemplateIsolated": true,
+    "aiSettingsCollapsed": true,
+    "comboRepricing": true,
+    "releaseHistoryRetained": true,
+    "dataSafety": true,
+    "restrictedBridge": true,
+    "noKeyStart": true,
+    "mockChat": true,
+    "attachmentChat": true,
+    "contextPreview": true,
+    "contextSend": true,
+    "dailyRename": true,
+    "inventoryStoreLink": true,
+    "storeManagementButtons": true,
+    "databaseSchema": "5",
+    "mabangDedupe": true,
+    "fuzzySearch": true,
+    "batterySuffixRule": true,
+    "activityFallbackConfig": true,
+    "activityStockBoundaries": true,
+    "pricingBoundaries": true,
+    "expenseBoundaries": true,
+    "inventoryAnalysis": true,
+    "inventoryExport": true,
+    "inventoryPersistence": true,
+    "inventorySkuRules": true,
+    "realInventorySample": true,
+    "realInventoryDetails": null,
+    "inventoryError": "",
+    "version": "17.0.0"
+  },
+  "localHealth": {
+    "ok": true,
+    "data": {
+      "service": "lazada-operations-center-northstar-api",
+      "version": "17.0.0",
+      "readOnly": true,
+      "startedAt": "2026-10-08T03:26:50.273Z"
+    }
+  },
+  "originalBusinessDataPreserved": true,
+  "installerSha256": "ae1836c3d22dac630e0a75d27ee5e37fdb3e3216fdaf1fd78b52ccfe59ebd101"
+}

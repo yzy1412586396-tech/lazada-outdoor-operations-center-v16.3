@@ -1,15 +1,13 @@
 (() => {
   'use strict';
 
-  const VERSION = '16.3';
+  const VERSION = '17.0';
   // V16.3 feature flag: the AI analysis template remains in the source and
   // bridge for a later re-enable, but is intentionally not exposed in the
   // current frontend. Do not delete the AI module; change this flag only in a
   // planned release after the feature has been reviewed again.
   const AI_ANALYSIS_TEMPLATE_ENABLED = false;
-  const ADVANCED_THEMES = {
-    'glass-light': { name: '云雾玻璃', tone: 'macOS 风格 · 白色透明与简洁蓝色', colors: ['#3478f6', '#dfeaf7', '#eef4fb'] },
-  };
+  const ADVANCED_THEMES = {};
   const restoredExpenseSlots = new Set();
   const clearedExpenseSlots = new Set();
   let uploadMetadata = new Map();
@@ -28,7 +26,7 @@
     const desiredTitle = `Lazada户外运营中心 V${VERSION}`;
     if (document.title !== desiredTitle) document.title = desiredTitle;
     const label = q('#brandSystemLabel');
-    const desiredLabel = `V${VERSION} · ${window.currentCountry === 'th' ? '泰国系统' : '菲律宾系统'}`;
+    const desiredLabel = `V${VERSION} · ${({ph:'菲律宾系统',th:'泰国系统',my:'马来西亚系统'})[window.currentCountry] || '菲律宾系统'}`;
     if (label && label.textContent !== desiredLabel) label.textContent = desiredLabel;
     const current = q('#page-changelog .changelog-current');
     const desiredCurrent = `当前版本 V${VERSION}`;
@@ -49,19 +47,7 @@
   function installThemes() {
     if (typeof THEMES !== 'object' || typeof appearance !== 'object') return;
     Object.assign(THEMES, ADVANCED_THEMES);
-    try {
-      const saved = JSON.parse(localStorage.getItem('lazadaOpsAppearanceV1') || '{}');
-      appearance.theme = 'glass-light';
-      localStorage.setItem('lazadaOpsGlassThemeV157', '1');
-      localStorage.setItem('lazadaOpsAppearanceV1', JSON.stringify(appearance));
-    } catch { /* keep current theme */ }
-    document.documentElement.dataset.theme = appearance.theme;
-    renderAppearance();
-    const current = q('#themeCurrent');
-    if (current) {
-      const theme = THEMES[appearance.theme];
-      current.innerHTML = `当前主题：<b>${theme.name}</b>　${theme.tone}。主题配置与业务数据一同保存在本机数据库。`;
-    }
+    applyAppearance(false);
   }
 
   function installReleaseNotes() {
@@ -71,6 +57,10 @@
       if (strong.textContent.includes('当前')) strong.textContent = '版本更新记录';
     });
     const releases = [
+      {version:'V17.0',date:'2026-10-08',type:'维护更新',major:false,title:'三国多控价数据库隔离与选择',items:['修复手动列映射导入总是写入国家默认库的问题，导入、冲突、版本、元数据均按所选数据库保存。','控价管理、控价导入、活动报名、全店改价分别保存当前国家的数据库选择；更换库后清除旧预览。','马来西亚新增独立 MYR 空间，按菲律宾同款 SKU 规则匹配，三国数据不混用。','修复活动分析国家变量与异步切换上下文；控价更新后清除匹配缓存，拒绝把其他国家备份恢复到当前国家。']},
+      {version:'V16.9',date:'2026-10-07',type:'维护更新',major:false,title:'Windows 四角与窗口可见范围',items:['使用独立的固定圆角表面，根页面保持透明，修复 body 背景传播到窗口画布导致四角变方的问题。','动态弹层也进入同一圆角表面；主题切换、页面缩放和窗口大小变化时，四角与视口四边同步。','启动和还原时按显示器实际工作区限制窗口范围，避免下边缘超出屏幕；小屏幕的最小尺寸同步适配。','Windows 首次显示等待界面样式准备完成，减少初始化阶段方角闪现。','已完成透明窗口渲染及四角像素检查；Windows 10 原生表现继续通过候选版试用确认。']},
+      {version:'V16.8',date:'2026-10-07',type:'维护更新',major:false,title:'主题、筛选词与品牌图标',items:['合并此前界面与窗口的维护内容，版本号按小更新增加 0.1 的规则统一为 V16.8。','保留晴空蓝、松林绿、暖沙金、雾紫、午夜蓝五套完整主题，以及内置思源黑体、思源宋体、三档字号和三种按钮形状；设置自动保存。','修复泰国系统启动和国家切换时重新添加默认筛选词的问题；用户删除或清空的识别词、排除词保持原样，新建系统才初始化默认词。','移除侧栏底部数据库说明；山峰与太阳 logo 改为浅色背景、深蓝山峰、橙色太阳，并同步应用窗口及软件图标；应用图标采用平滑圆角方形与透明外侧。','移除 Windows 二值窗口区域裁剪，改用抗锯齿圆角表面方案及独立边缘缩放；Windows 10 外窗效果仍待真机视觉验收，当前不作为已验收安装版发布。','Mac 保持原生窗口圆角与原生拖动，全店改价早鸟价选择器及全部业务功能继续保留。']},
+      {version:'V16.4',date:'2026-10-07',type:'维护更新',major:false,title:'全店改价与窗口性能',items:['菲律宾、泰国全店改价新增早鸟价规则选择，关闭后空白 SpecialPrice 也按现有 LA控价匹配回填。','使用原生窗口拖动和不透明窗口，减少拖动抖动及玻璃模糊绘制开销。','全店改价预览每页100条，导出仍包含全部 SKU；单次分析复用控价索引。']},
       {
         version: 'V13.0', date: '2026-07-15', type: '大更新', major: true, title: '版本更新记录',
         items: [
@@ -295,7 +285,7 @@
         ],
       },
     ];
-    for (const release of releases) {
+    for (const release of releases.sort((a, b) => a.date.localeCompare(b.date) || a.version.localeCompare(b.version,undefined,{numeric:true}))) {
       const exists = list.querySelector(`[data-release-version="${release.version}"]`) || (release.legacySelector ? list.querySelector(release.legacySelector) : null);
       if (exists) {
         exists.dataset.releaseVersion = release.version;
@@ -750,7 +740,7 @@
           .hero,.section-title{gap:14px!important}.hero h1{font-size:27px!important}.privacy,.panel,.shop-card,.actions,.loading-card{border:0!important;background:rgba(255,255,255,.72)!important;box-shadow:0 12px 34px rgba(45,68,94,.07)!important;backdrop-filter:blur(28px) saturate(1.04)!important;-webkit-backdrop-filter:blur(28px) saturate(1.04)!important}
           .panel{padding:18px!important}.shop-head{background:rgba(255,255,255,.32)!important;border-bottom-color:rgba(79,106,135,.08)!important}.upload-item,.metric,.table-wrap{border-color:rgba(79,106,135,.10)!important;background:rgba(255,255,255,.30)!important}.upload-item{border-style:dashed!important;padding:11px!important}
           input[type=date],input[type=number],input[type=text],select,.table-input{border:0!important;background:rgba(255,255,255,.76)!important;color:#24384d!important;box-shadow:inset 0 1px rgba(255,255,255,.72),0 5px 15px rgba(45,68,94,.05)!important}
-          .primary{background:#3478f6!important;box-shadow:0 8px 20px rgba(52,120,246,.20)!important}.secondary,.mini-btn{border:0!important;background:rgba(255,255,255,.68)!important;color:#35506b!important}.status.ok,summary{color:#3478f6!important}.badge.ok{background:rgba(52,120,246,.10)!important;color:#3478f6!important}
+          *{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}.primary{background:#3478f6!important;box-shadow:0 8px 20px rgba(52,120,246,.20)!important}.secondary,.mini-btn{border:0!important;background:rgba(255,255,255,.68)!important;color:#35506b!important}.status.ok,summary{color:#3478f6!important}.badge.ok{background:rgba(52,120,246,.10)!important;color:#3478f6!important}
           .desktop-file-field{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:7px;width:100%;min-height:39px;padding:6px 7px;border:1px solid rgba(52,120,246,.18);border-radius:12px;background:rgba(255,255,255,.62);box-shadow:inset 0 1px rgba(255,255,255,.72),0 6px 16px rgba(45,68,94,.05);overflow:hidden}.desktop-file-native{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;opacity:0!important;cursor:pointer!important}.desktop-file-choose{position:relative;z-index:2;min-height:27px;padding:0 10px;border:0;border-radius:8px;background:rgba(52,120,246,.10);color:#245fc9;font-size:10px;font-weight:800}.desktop-file-name,.desktop-file-state{position:relative;z-index:2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#6a7a8c;font-size:10px;pointer-events:none}.desktop-clear-upload{position:relative;z-index:3;margin:0;padding:6px 9px;border:0;border-radius:8px;background:rgba(255,255,255,.62);color:#536579;cursor:pointer}
           th{background:rgba(229,238,248,.76)!important;color:#41617f!important}td,th{border-bottom-color:rgba(79,106,135,.08)!important}.actions{background:rgba(255,255,255,.78)!important}
           @media(max-width:1050px){.page{padding:18px 14px 48px!important}.top-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.shop-grid{grid-template-columns:1fr!important}.uploads{grid-template-columns:repeat(3,minmax(0,1fr))!important}.money-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.template-box{align-items:stretch!important}.template-box input{max-width:none!important}.desktop-file-field{min-width:0!important}.hero{display:flex!important}.privacy{margin-top:0!important}}
