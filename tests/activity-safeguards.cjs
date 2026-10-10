@@ -4,11 +4,17 @@ const timer=setTimeout(()=>app.exit(1),120000);
 app.on('browser-window-created',(_,win)=>win.webContents.once('did-finish-load',async()=>{try{
  await new Promise(r=>setTimeout(r,2400));win.setSize(1440,900);
  const report=await win.webContents.executeJavaScript('('+fs.readFileSync(path.join(__dirname,'activity-safeguards-renderer.js'),'utf8')+')()');
- await win.webContents.executeJavaScript('state.activityPriceRatioWarning=0.95;renderActivityResult()');
+ await win.webContents.executeJavaScript('state.activityPriceRatioWarning=0.95;activityViewCache=null;activityPage=1;renderActivityResult()');
  await new Promise(r=>setTimeout(r,3200));
  for(const theme of ['glass-light','forest','sand','violet','night']){
   await win.webContents.executeJavaScript(`appearance.theme='${theme}';applyAppearance();go('activity');$('#activityTable').closest('.panel').scrollIntoView();`);await new Promise(r=>setTimeout(r,220));fs.writeFileSync(path.join(out,'preview-'+theme+'.png'),(await win.webContents.capturePage()).toPNG());
  }
+ // A mixed fixture makes excluded rows and warning-first ordering visible together.
+ await win.webContents.executeJavaScript('window.savedVisualSession=activitySession;activitySession={...activitySession,results:window.activityWarningVisualRows};activityViewCache=null;activityPage=1;renderActivityResult()');
+ for(const theme of ['glass-light','night']){
+  await win.webContents.executeJavaScript(`appearance.theme='${theme}';applyAppearance();$('#activityTable').closest('.panel').scrollIntoView()`);await new Promise(r=>setTimeout(r,220));fs.writeFileSync(path.join(out,'mixed-'+theme+'.png'),(await win.webContents.capturePage()).toPNG());
+ }
+ await win.webContents.executeJavaScript('activitySession=window.savedVisualSession;activityViewCache=null;activityPage=1;renderActivityResult()');
  await win.webContents.executeJavaScript(`appearance.theme='glass-light';applyAppearance();go('activity');document.querySelector('.main').scrollTop=0;$('#actPresetTrigger').click()`);await new Promise(r=>setTimeout(r,220));fs.writeFileSync(path.join(out,'form-presets.png'),(await win.webContents.capturePage()).toPNG());
  await win.webContents.executeJavaScript(`$('#actPresetList').hidePopover();$('#v152DownloadsButton').click()`);await new Promise(r=>setTimeout(r,220));
  const menu=await win.webContents.executeJavaScript(`(()=>{const entry=document.querySelector('[data-download-id="v171-test-download"]');if(!entry)throw Error('download fixture missing');entry.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:innerWidth-70,clientY:120}));const menu=document.querySelector('.v152-download-context'),button=menu.querySelector('[data-download-context="copy"]'),rect=button.getBoundingClientRect();return{open:menu.matches(':popover-open'),top:document.elementFromPoint(rect.x+8,rect.y+8)===button,bounds:{x:rect.x,y:rect.y,width:rect.width,height:rect.height}}})()`);assert(menu.open&&menu.top,'context menu top layer hit test');report.downloadMenu=menu;

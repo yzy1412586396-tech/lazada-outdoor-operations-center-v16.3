@@ -12,8 +12,8 @@ const { registerAutomationFolderHandlers } = require('./automation-folders');
 const { NorthstarReadOnlyServer } = require('./northstar-server');
 
 const APP_NAME = 'Lazada户外运营中心';
-const APP_VERSION = '17.1.0';
-const DISPLAY_VERSION = '17.1';
+const APP_VERSION = '17.2.0';
+const DISPLAY_VERSION = '17.2';
 const TRANSPARENT_DRAG_ICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 const isSmokeTest = process.argv.includes('--smoke-test');
 const isRealInventoryTest = process.argv.includes('--real-inventory-test');

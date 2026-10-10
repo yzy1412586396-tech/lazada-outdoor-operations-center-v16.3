@@ -436,8 +436,8 @@ $('.main').addEventListener('scroll',()=>{if($('#actPresetList').matches(':popov
 // 仅保存活动设置，避免每次改一个数字都重绘全站控价和店铺表格。
 function persistActivityPreferences(){try{localStorage.setItem({ph:'lazadaOpsPhilippinesSystemV8',th:'lazadaOpsThailandSystemV8'}[window.currentCountry],JSON.stringify(state))}catch(e){toast('保存失败：'+e.message,'err')}}
 function activityRatioWarningMinimum(){const value=state.activityPriceRatioWarning;return value!==null&&value!==''&&Number.isFinite(Number(value))&&Number(value)>=0?Number(value):0.95}
-function activityPriceRatio(x){const price=activityFinalPrice(x),current=x.currentPrice;return price!=null&&Number.isFinite(Number(price))&&Number(price)>=0&&current!=null&&Number.isFinite(Number(current))&&Number(current)>0?Number(price)/Number(current):null}
-function activityRatioWarns(x){const ratio=activityPriceRatio(x);return ratio!=null&&ratio<activityRatioWarningMinimum()}
+function activityPriceRatio(x){const price=activityFinalPrice(x),current=x.currentPrice;return price!=null&&Number.isFinite(Number(price))&&Number(price)>0&&current!=null&&Number.isFinite(Number(current))&&Number(current)>0?Number(price)/Number(current):null}
+function activityRatioWarns(x){const ratio=activityPriceRatio(x);return activityCanExport(x)&&ratio!=null&&ratio<activityRatioWarningMinimum()}
 $('#activityPriceRatioWarning').onchange=()=>{
  const input=$('#activityPriceRatioWarning'),raw=input.value.trim(),value=Number(raw);
  if(raw===''||!Number.isFinite(value)||value<0){input.value=activityRatioWarningMinimum();toast('提醒值请输入不小于 0 的数字，例如 0.95','err');return}
@@ -595,7 +595,8 @@ $('#analyzeActivityBtn').onclick=async()=>{
  finally{controlIndexCache=null;btn.disabled=false;btn.textContent='识别模板并生成结果'}
 };
 function countStatuses(rows){const c={total:rows.length};for(const r of rows)c[r.statusCode]=(c[r.statusCode]||0)+1;c.heroFailed=rows.filter(x=>x.isHero&&!activityCanExport(x)&&x.statusCode!=='update').length;c.earlyBird=rows.filter(x=>x.isEarlyBird).length;return c}
-function activityFinalPrice(x){return roundPrice(x.manualPrice!=null?x.manualPrice:x.suggestedPrice)}
+// V17.2：空报名价保持 null，不让 Number(null) 生成假 0% 提醒。
+function activityFinalPrice(x){const value=x.manualPrice!=null?x.manualPrice:x.suggestedPrice;return value==null||value===''?null:roundPrice(value)}
 function activityCanExport(x){const p=activityFinalPrice(x);return !!x.manualInclude&&p!=null&&Number.isFinite(Number(p))&&Number(p)>0&&(x.thresholdPrice==null||Number(p)<=Number(x.thresholdPrice)+1e-8)}
 function activityExportRows(){return activitySession?activitySession.results.filter(activityCanExport):[]}
 function renderActivityResult(){const {m,sh,results}=activitySession;const counts=countStatuses(results);activitySession.counts=counts;const exportable=activityExportRows().length,manual=results.filter(x=>x.manualPrice!=null&&activityCanExport(x)).length;$('#activityMetrics').innerHTML=metricHtml([['处理商品',counts.total,'全部 SKU'],['最终导出',exportable,'含人工修正','good'],['人工修正',manual,'手动填写并勾选','warn'],['价格门槛不足',counts.price_gap||0,'可重新核价','danger'],['未匹配/冲突',(counts.unmatched||0)+(counts.control_conflict||0)+(counts.unmatched_combo||0)+(counts.battery_suffix_risk||0)+(counts.pool_control_missing||0),'默认不导出','danger'],['低于提醒值',results.filter(activityRatioWarns).length,'报名价 ÷ 售价 < '+activityRatioWarningMinimum(),'danger']]);$('#activityConfidence').textContent='识别置信度：'+m.confidence;if(activitySession.mappingRendered!==m){$('#activityMapping').innerHTML=mappingHtml(m,sh);activitySession.mappingRendered=m}renderActivityTable()}
@@ -608,7 +609,7 @@ function renderActivityTable(){
  const q=cleanText($('#activitySearch').value).toLowerCase(),f=$('#activityFilter').value;
  if(!activityViewCache||activityViewCache.session!==activitySession||activityViewCache.q!==q||activityViewCache.f!==f){
   const rows=activitySession.results.filter(x=>(!q||(window.__fuzzySearchV14?.matches?window.__fuzzySearchV14.matches(x.sellerSku+' '+x.cn+' '+x.originalTitle,q,'activitySearch'):(x.sellerSku+' '+x.cn+' '+x.originalTitle).toLowerCase().includes(q)))&&(f==='all'||x.statusCode===f||(f==='manual'&&x.manualPrice!=null)||(f==='failed'&&!activityCanExport(x))||(f==='hero'&&x.isHero)||(f==='early'&&x.isEarlyBird)||(f==='ratio_warning'&&activityRatioWarns(x))));
-  rows.sort((a,b)=>(b.isHero&&!activityCanExport(b))-(a.isHero&&!activityCanExport(a)));activityViewCache={session:activitySession,q,f,rows};
+  rows.sort((a,b)=>Number(activityRatioWarns(b))-Number(activityRatioWarns(a))||Number(b.isHero&&!activityCanExport(b))-Number(a.isHero&&!activityCanExport(a)));activityViewCache={session:activitySession,q,f,rows};
  }
  const rows=activityViewCache.rows,pages=Math.max(1,Math.ceil(rows.length/100));activityPage=Math.min(Math.max(1,activityPage),pages);
  $('#activityTable').innerHTML=rows.slice((activityPage-1)*100,activityPage*100).map(x=>{

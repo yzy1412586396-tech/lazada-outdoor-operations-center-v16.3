@@ -1,6 +1,6 @@
 {
   "name": "lazada-outdoor-operations-center",
-  "version": "17.1.0",
+  "version": "17.2.0",
   "description": "Lazada户外运营中心桌面版",
   "main": "electron/main.js",
   "author": {
@@ -41,7 +41,7 @@
         }
       ],
       "signAndEditExecutable": false,
-      "artifactName": "Lazada-Operations-Center-17.1-Setup-x64.${ext}",
+      "artifactName": "Lazada-Operations-Center-17.2-Setup-x64.${ext}",
       "icon": "build/icon.ico"
     },
     "nsis": {

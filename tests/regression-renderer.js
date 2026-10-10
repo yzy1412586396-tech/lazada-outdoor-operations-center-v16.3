@@ -64,8 +64,8 @@ async function(){
  report.drag={native:getComputedStyle(document.querySelector('.v155-window-brand')).getPropertyValue('-webkit-app-region'),blur:getComputedStyle(document.querySelector('.panel')).backdropFilter};
  check(report.drag.native==='drag','native dragging enabled');check(report.drag.blur==='none','blur disabled');
  const latest=document.querySelector('#page-changelog .changelog-list .release-card');
- check(latest?.dataset.releaseVersion==='V17.1','latest release appears first');
- check(document.title.includes('17.1'),'window version updated');
+ check(latest?.dataset.releaseVersion==='V17.2','latest release appears first');
+ check(document.title.includes('17.2'),'window version updated');
  report.release={version:latest.dataset.releaseVersion,latestFirst:true};
  report.ok=true;return report;
 }
