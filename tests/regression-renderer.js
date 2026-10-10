@@ -12,7 +12,7 @@ async function(){
  const comboRow=realRows.find(x=>x.special==null&&/X/.test(x.sku)&&combos.items.has(window.__skuSuffixV14.normalizeCombo(x.sku)));check(comboRow,'real blank combo row');
  const def=combos.items.get(window.__skuSuffixV14.normalizeCombo(comboRow.sku));
  report.source={rows:realRows.length,blank:realRows.filter(x=>x.special==null).length,comboDefinitions:combos.items.size,blankSku:blank.sku,comboSku:comboRow.sku,comboDefinition:def};
- for(const country of ['ph','th','my']){
+ for(const country of ['ph','th']){
   window.__opsDebug.switchCountry(country);
   const db=state.databases[0].id;
   const records=def.components.map((x,i)=>({sku:x.sku,la_price:100+i*10,product_name_cn:'测试组件',library_type:'ordinary',database_id:db,is_forbidden:0}));
@@ -45,7 +45,7 @@ async function(){
   report.exports.push({name:country+'-ignore.xlsx',bytes:Array.from(new Uint8Array(await blob.arrayBuffer()))});
   report.countries.push({country,analysisMs:Math.round(elapsed),patchCount:repricingPatchRows().length,blankPrice:row.suggestedPrice,comboPrice:bundle.suggestedPrice,storedRule:state.repricingProtectEarlyBird});
  }
- for(const country of ['ph','th','my']){
+ for(const country of ['ph','th']){
   window.__opsDebug.switchCountry(country);const db=state.databases[0].id;
   const testRows=[['SellerSKU','SpecialPrice','Price','商品标题'],['T4EE0000001',null,200,'测试'],['T4EE0000002',150,200,'测试'],['T4EE0000003',null,200,'测试'],['T4EE0000004',null,200,'测试'],['T4EE0000005',null,200,'测试'],['T4EE0000006',100,200,'测试'],['T4EE0000007',null,null,'测试']];
   const w=XLSX.utils.book_new();XLSX.utils.book_append_sheet(w,XLSX.utils.aoa_to_sheet(testRows),'template');
@@ -64,8 +64,8 @@ async function(){
  report.drag={native:getComputedStyle(document.querySelector('.v155-window-brand')).getPropertyValue('-webkit-app-region'),blur:getComputedStyle(document.querySelector('.panel')).backdropFilter};
  check(report.drag.native==='drag','native dragging enabled');check(report.drag.blur==='none','blur disabled');
  const latest=document.querySelector('#page-changelog .changelog-list .release-card');
- check(latest?.dataset.releaseVersion==='V17.0','latest release appears first');
- check(document.title.includes('17.0'),'window version updated');
+ check(latest?.dataset.releaseVersion==='V17.1','latest release appears first');
+ check(document.title.includes('17.1'),'window version updated');
  report.release={version:latest.dataset.releaseVersion,latestFirst:true};
  report.ok=true;return report;
 }

@@ -8,8 +8,8 @@ app.on('browser-window-created',(_,win)=>win.webContents.once('did-finish-load',
  await win.webContents.executeJavaScript('desktopApp.database.flush()');
  fs.writeFileSync(path.join(out,'control-three-countries.png'),(await win.webContents.capturePage()).toPNG());
  const done=new Promise(r=>win.webContents.once('did-finish-load',r));win.reload();await done;await new Promise(r=>setTimeout(r,2000));
- const reloaded=await win.webContents.executeJavaScript(`(()=>{const out={};for(const c of ['ph','th','my']){__opsDebug.switchCountry(c);out[c]={selections:structuredClone(state.databaseSelections),records:structuredClone(state.controlRecords),conflicts:structuredClone(state.controlConflicts)};}go('repricing');return out})()`);
- for(const c of ['ph','th','my']){assert.deepEqual(reloaded[c].records,result[c].records);assert.deepEqual(reloaded[c].conflicts,result[c].conflicts);assert.deepEqual(reloaded[c].selections,result[c].selections);}
+ const reloaded=await win.webContents.executeJavaScript(`(()=>{const out={};for(const c of ['ph','th']){__opsDebug.switchCountry(c);out[c]={selections:structuredClone(state.databaseSelections),records:structuredClone(state.controlRecords),conflicts:structuredClone(state.controlConflicts)};}go('repricing');return out})()`);
+ for(const c of ['ph','th']){assert.deepEqual(reloaded[c].records,result[c].records);assert.deepEqual(reloaded[c].conflicts,result[c].conflicts);assert.deepEqual(reloaded[c].selections,result[c].selections);}
  fs.writeFileSync(path.join(out,'repricing-malaysia.png'),(await win.webContents.capturePage()).toPNG());
  await win.webContents.executeJavaScript("go('activity')");await new Promise(r=>setTimeout(r,200));fs.writeFileSync(path.join(out,'activity-malaysia.png'),(await win.webContents.capturePage()).toPNG());
  await win.webContents.executeJavaScript("go('control')");await new Promise(r=>setTimeout(r,200));fs.writeFileSync(path.join(out,'control-malaysia.png'),(await win.webContents.capturePage()).toPNG());

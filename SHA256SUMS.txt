@@ -1,1 +1,1 @@
-ae1836c3d22dac630e0a75d27ee5e37fdb3e3216fdaf1fd78b52ccfe59ebd101  Lazada-Operations-Center-17.0-Candidate-Setup-x64.exe
+78d15edfa03a0c20ca95fcbd3c0836e0f203987c0a6311e8b13a4ae49f2dcd3a  Lazada-Operations-Center-17.1-Candidate-Setup-x64.exe

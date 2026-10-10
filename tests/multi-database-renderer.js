@@ -4,7 +4,7 @@ async function(){
  const setFile=(id,f)=>{const dt=new DataTransfer();dt.items.add(f);$('#'+id).files=dt.files;};
  const select=(id,value)=>{$('#'+id).value=value;$('#'+id).dispatchEvent(new Event('change'));};
  const importFile=async(n)=>{const f=file(n);setFile('controlFile',f);await $('#controlFile').onchange({target:$('#controlFile')});await $('#importControlBtn').onclick();check(!$('#controlImportMsg').textContent.includes('失败'),'import failed '+$('#controlImportMsg').textContent);};
- for(const c of ['ph','th','my']){
+ for(const c of ['ph','th']){
   __opsDebug.switchCountry(c);go('control');const local=state.databases[0].id;
   $('#addDatabaseBtn').click();$('#newDatabaseName').value='跨境控价';$('#modalOk').click();const cross=$('#controlDatabase').value;check(cross!==local,'new database');
   select('controlImportDatabase',local);await importFile('local');
@@ -35,6 +35,6 @@ async function(){
   select('controlImportDatabase',cross);select('actDatabase',cross);select('repDatabase',local);
   output[c]={records:structuredClone(state.controlRecords),conflicts:structuredClone(state.controlConflicts),selections:structuredClone(state.databaseSelections)};
  }
- check(document.querySelector('[data-country="my"]').classList.contains('active'),'Malaysia header');check(document.querySelector('#countryCurrencyBadge').textContent.includes('MYR'),'Malaysia currency');
+ check(!document.querySelector('[data-country="my"]'),'Malaysia entry suspended');check(document.querySelector('#countryCurrencyBadge').textContent.includes('THB'),'Thailand currency');
  return output;
 }

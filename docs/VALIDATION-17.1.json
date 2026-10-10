@@ -1,0 +1,92 @@
+{
+  "version": "17.1",
+  "activity": {
+    "countries": [
+      {
+        "country": "ph",
+        "rows": 205,
+        "exported": 205,
+        "analysisMs": 60.099999994039536,
+        "initial10kPreviewMs": 6.299999997019768,
+        "pagingMs": [
+          4.600000008940697,
+          4.399999991059303,
+          4.5,
+          4.4000000059604645,
+          4.399999991059303
+        ],
+        "warningMinimum": 0.95
+      },
+      {
+        "country": "th",
+        "rows": 205,
+        "exported": 205,
+        "analysisMs": 152,
+        "initial10kPreviewMs": 5.799999997019768,
+        "pagingMs": [
+          4.4000000059604645,
+          4.399999991059303,
+          4.4000000059604645,
+          4.200000002980232,
+          4.399999991059303
+        ],
+        "warningMinimum": 0.9
+      }
+    ],
+    "downloadMenu": {
+      "open": true,
+      "top": true,
+      "bounds": {
+        "x": 1273,
+        "y": 200.390625,
+        "width": 154,
+        "height": 37.6953125
+      }
+    },
+    "reload": {
+      "ph": {
+        "ratio": 0.95,
+        "presets": [
+          "保留预设"
+        ]
+      },
+      "th": {
+        "ratio": 0.9,
+        "presets": [
+          "保留预设"
+        ]
+      },
+      "my": "{\"country\":\"my\",\"sentinel\":\"keep-existing-malaysia-data\"}"
+    }
+  },
+  "package": {
+    "version": "17.1.0",
+    "winInstallerAsarMatchesUnpacked": true,
+    "macWinSourceMatches": true,
+    "checked": [
+      "electron/automation-folders.js",
+      "electron/database.js",
+      "electron/download-policy.js",
+      "electron/ipc-handlers.js",
+      "electron/main.js",
+      "electron/northstar-server.js",
+      "electron/preload.js",
+      "electron/schema.js",
+      "electron/window-surface.js",
+      "app/index.html",
+      "app/themes.css",
+      "app/themes-runtime.js",
+      "app/desktop-enhancements.js",
+      "app/desktop-enhancements.css",
+      "app/app-icon.png",
+      "app/logo.png",
+      "app/fonts/NotoSansSC.ttf",
+      "app/fonts/NotoSerifSC.ttf"
+    ],
+    "businessDataIncluded": false,
+    "windows10NativeTested": false
+  },
+  "visualScreenshotsPersonallyInspected": true,
+  "windows10NativeTested": false,
+  "installerSha256": "78d15edfa03a0c20ca95fcbd3c0836e0f203987c0a6311e8b13a4ae49f2dcd3a"
+}

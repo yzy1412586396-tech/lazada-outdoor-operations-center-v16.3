@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '17.0';
+  const VERSION = '17.1';
   // V16.3 feature flag: the AI analysis template remains in the source and
   // bridge for a later re-enable, but is intentionally not exposed in the
   // current frontend. Do not delete the AI module; change this flag only in a
@@ -57,6 +57,7 @@
       if (strong.textContent.includes('当前')) strong.textContent = '版本更新记录';
     });
     const releases = [
+      {version:'V17.1',date:'2026-10-10',type:'维护更新',major:false,title:'活动低价提醒、预设管理与预览性能',items:['活动报名新增可填写的报名价÷售价提醒值，低于提醒值的行高亮显示；手动改价同步更新，提醒不写入原模板、不改变报名资格。','未匹配 SKU 门槛规则只允许点击小方框切换，蓝色背景和文字不再误触。','活动预设列表每项增加独立删除按钮，删除后保存；活动结果每页100条，分页不限制全量导出。','最近下载右键菜单进入最顶层，修复被下载列表覆盖的问题。','暂时移除马来西亚入口，保留原数据；菲律宾和泰国继续独立保存各项设置。']},
       {version:'V17.0',date:'2026-10-08',type:'维护更新',major:false,title:'三国多控价数据库隔离与选择',items:['修复手动列映射导入总是写入国家默认库的问题，导入、冲突、版本、元数据均按所选数据库保存。','控价管理、控价导入、活动报名、全店改价分别保存当前国家的数据库选择；更换库后清除旧预览。','马来西亚新增独立 MYR 空间，按菲律宾同款 SKU 规则匹配，三国数据不混用。','修复活动分析国家变量与异步切换上下文；控价更新后清除匹配缓存，拒绝把其他国家备份恢复到当前国家。']},
       {version:'V16.9',date:'2026-10-07',type:'维护更新',major:false,title:'Windows 四角与窗口可见范围',items:['使用独立的固定圆角表面，根页面保持透明，修复 body 背景传播到窗口画布导致四角变方的问题。','动态弹层也进入同一圆角表面；主题切换、页面缩放和窗口大小变化时，四角与视口四边同步。','启动和还原时按显示器实际工作区限制窗口范围，避免下边缘超出屏幕；小屏幕的最小尺寸同步适配。','Windows 首次显示等待界面样式准备完成，减少初始化阶段方角闪现。','已完成透明窗口渲染及四角像素检查；Windows 10 原生表现继续通过候选版试用确认。']},
       {version:'V16.8',date:'2026-10-07',type:'维护更新',major:false,title:'主题、筛选词与品牌图标',items:['合并此前界面与窗口的维护内容，版本号按小更新增加 0.1 的规则统一为 V16.8。','保留晴空蓝、松林绿、暖沙金、雾紫、午夜蓝五套完整主题，以及内置思源黑体、思源宋体、三档字号和三种按钮形状；设置自动保存。','修复泰国系统启动和国家切换时重新添加默认筛选词的问题；用户删除或清空的识别词、排除词保持原样，新建系统才初始化默认词。','移除侧栏底部数据库说明；山峰与太阳 logo 改为浅色背景、深蓝山峰、橙色太阳，并同步应用窗口及软件图标；应用图标采用平滑圆角方形与透明外侧。','移除 Windows 二值窗口区域裁剪，改用抗锯齿圆角表面方案及独立边缘缩放；Windows 10 外窗效果仍待真机视觉验收，当前不作为已验收安装版发布。','Mac 保持原生窗口圆角与原生拖动，全店改价早鸟价选择器及全部业务功能继续保留。']},
@@ -368,6 +369,7 @@
     document.body.appendChild(panel);
     const contextMenu = document.createElement('div');
     contextMenu.className = 'v152-download-context';
+    contextMenu.setAttribute('popover', 'manual');
     contextMenu.hidden = true;
     contextMenu.innerHTML = '<button type="button" data-download-context="open">打开文件</button><button type="button" data-download-context="location">打开所在位置</button><button type="button" data-download-context="copy">复制文件路径</button><div class="separator"></div><button type="button" class="danger" data-download-context="remove">删除下载记录</button>';
     document.body.appendChild(contextMenu);
@@ -377,7 +379,7 @@
     let renderSignature = '';
     let pendingRenderItems = null;
     let renderFrame = 0;
-    const closeContextMenu = () => { contextItem = null; contextMenu.hidden = true; };
+    const closeContextMenu = () => { contextItem = null; if(contextMenu.matches(':popover-open'))contextMenu.hidePopover(); contextMenu.hidden = true; };
     const openContextMenu = (event, item) => {
       if (!item?.id) return;
       contextItem = item;
@@ -386,11 +388,14 @@
       q('[data-download-context="location"]', contextMenu).disabled = !available;
       q('[data-download-context="copy"]', contextMenu).disabled = !item.path;
       contextMenu.hidden = false;
+      // V17.1：top layer 不受下载面板 z-index 或圆角容器的裁剪影响。
+      if(!contextMenu.matches(':popover-open'))contextMenu.showPopover();
       const left = Math.min(event.clientX, window.innerWidth - contextMenu.offsetWidth - 8);
       const top = Math.min(event.clientY, window.innerHeight - contextMenu.offsetHeight - 8);
       contextMenu.style.left = `${Math.max(8, left)}px`;
-      contextMenu.style.top = `${Math.max(8, top)}px`;
+      contextMenu.style.top = `${Math.max(60, top)}px`;
     };
+    window.addEventListener('resize', closeContextMenu);
     const render = (items = []) => {
       latestItems = Array.isArray(items) ? items : [];
       const signature = JSON.stringify(latestItems.map((item) => [item.id, item.name, item.state, item.size, item.received, item.path, item.available, item.completedAt]));

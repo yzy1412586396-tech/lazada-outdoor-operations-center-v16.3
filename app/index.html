@@ -223,7 +223,7 @@ button.store-pill{cursor:pointer}.appearance-shortcut:hover{border-color:rgba(va
 
 </aside>
 <main class="main">
-<header class="topbar"><div><h1 id="pageTitle">运营总览</h1><p id="pageSub">查看控价库、店铺商品和近期处理情况</p></div><div class="country-switch" id="countrySwitch" aria-label="国家系统切换"><button type="button" data-country="ph" class="active"><span>🇵🇭</span><b>菲律宾系统</b><small>PHP · 菲律宾规则</small></button><button type="button" data-country="th"><span>🇹🇭</span><b>泰国系统</b><small>THB · 泰国规则</small></button><button type="button" data-country="my"><span>🇲🇾</span><b>马来西亚系统</b><small>MYR · 菲律宾同款规则</small></button></div><div class="top-actions"><span class="store-pill" id="countryCurrencyBadge">₱ PHP</span><span class="store-pill" id="topStore">4 个店铺</span><span class="store-pill">本地数据</span></div></header>
+<header class="topbar"><div><h1 id="pageTitle">运营总览</h1><p id="pageSub">查看控价库、店铺商品和近期处理情况</p></div><div class="country-switch" id="countrySwitch" aria-label="国家系统切换"><button type="button" data-country="ph" class="active"><span>🇵🇭</span><b>菲律宾系统</b><small>PHP · 菲律宾规则</small></button><button type="button" data-country="th"><span>🇹🇭</span><b>泰国系统</b><small>THB · 泰国规则</small></button></div><div class="top-actions"><span class="store-pill" id="countryCurrencyBadge">₱ PHP</span><span class="store-pill" id="topStore">4 个店铺</span><span class="store-pill">本地数据</span></div></header>
 
  <section class="page active" id="page-dashboard">
   <div class="hero"><div><h2>把复杂的活动报名，变成一次可审计的判断</h2><p>控价匹配、活动门槛、早鸟价、主推商品和库存风险都在本机完成。最终只回填平台允许修改的单元格，原文件其他内容保持不动。</p></div><div class="hero-actions"><button class="btn primary" data-go="activity">开始活动报名</button><button class="btn ghost" data-go="repricing">开始全店改价</button></div></div>
@@ -265,9 +265,9 @@ button.store-pill{cursor:pointer}.appearance-shortcut:hover{border-color:rgba(va
 
  <section class="page" id="page-activity">
   <div class="panel form"><div class="panel-head"><div><div class="eyebrow">Activity workflow</div><h3>活动报名审核与回填</h3><p>上传平台原始模板，自动识别 SKU、标题、当前价格、价格门槛、活动价和库存列。</p></div><button class="btn light sm" id="addPresetBtn">新增活动预设</button></div>
-   <div class="grid4"><label>店铺<select id="actStore"></select></label><label>控价数据库<select id="actDatabase"></select></label><label>控价类型<select id="actType"><option value="regular">平时活动控价</option><option value="campaign">大促活动控价</option></select></label><label>活动预设<select id="actPreset"></select></label><label>活动名称<input id="actName" placeholder="用于文件命名和历史记录"></label><label>开始日期<input type="date" id="actStart"></label><label>结束日期<input type="date" id="actEnd"></label><label>活动库存方式<select id="stockMode"><option value="none">不自动填写</option><option value="uniform">统一填写</option></select></label><label id="stockValueLabel" class="hidden">统一活动库存<input type="number" id="stockValue" min="0" step="1"></label><label id="stockPolicyLabel" class="hidden">库存不足时<select id="stockPolicy"><option value="exclude">剔除该 SKU</option><option value="cap">按当前库存上限填写</option></select></label></div>
+   <div class="grid4"><label>店铺<select id="actStore"></select></label><label>控价数据库<select id="actDatabase"></select></label><label>控价类型<select id="actType"><option value="regular">平时活动控价</option><option value="campaign">大促活动控价</option></select></label><div class="activity-preset-field"><span class="activity-field-label">活动预设</span><select id="actPreset" hidden aria-hidden="true" tabindex="-1"></select><button type="button" class="activity-preset-trigger" id="actPresetTrigger" aria-expanded="false" aria-controls="actPresetList">手动输入 <span>⌄</span></button><div id="actPresetList" class="activity-preset-list" popover="auto" aria-label="活动预设列表"></div></div><label>活动名称<input id="actName" placeholder="用于文件命名和历史记录"></label><label>开始日期<input type="date" id="actStart"></label><label>结束日期<input type="date" id="actEnd"></label><label>活动库存方式<select id="stockMode"><option value="none">不自动填写</option><option value="uniform">统一填写</option></select></label><label>报名价 ÷ 售价提醒值<input type="number" id="activityPriceRatioWarning" min="0" step="any" value="0.95" inputmode="decimal"><small>低于此值高亮提醒，例如 0.95 或 0.90；只在预览显示</small></label><label id="stockValueLabel" class="hidden">统一活动库存<input type="number" id="stockValue" min="0" step="1"></label><label id="stockPolicyLabel" class="hidden">库存不足时<select id="stockPolicy"><option value="exclude">剔除该 SKU</option><option value="cap">按当前库存上限填写</option></select></label></div>
    <div class="callout info" style="margin-top:14px">
-    <label class="checkline"><input type="checkbox" id="activityThresholdFallback"><span><strong>开启未匹配 SKU 的门槛比例报名规则</strong></span></label>
+    <div class="checkline activity-toggle-line"><input type="checkbox" id="activityThresholdFallback" aria-label="开启未匹配 SKU 的门槛比例报名规则"><span><strong>开启未匹配 SKU 的门槛比例报名规则</strong></span></div>
     <div class="grid2" id="activityFallbackSettings" style="margin-top:12px">
      <label>平时活动最低比例<input type="number" id="activityFallbackRegularRatio" min="0" max="10" step="0.001" value="0.970" inputmode="decimal"><small>例如 0.97 代表门槛价 ÷ 当前售价至少达到 97%</small></label>
      <label>大促活动最低比例<input type="number" id="activityFallbackCampaignRatio" min="0" max="10" step="0.001" value="0.960" inputmode="decimal"><small>例如 0.96 代表门槛价 ÷ 当前售价至少达到 96%</small></label>
@@ -281,7 +281,7 @@ button.store-pill{cursor:pointer}.appearance-shortcut:hover{border-color:rgba(va
   <div id="activityResult" class="hidden">
    <div class="metrics" id="activityMetrics"></div>
    <div class="panel"><div class="panel-head"><div><div class="eyebrow">字段识别</div><h3>模板映射确认</h3><p>下载前先核对系统识别到了哪一列。</p></div><span class="chip blue" id="activityConfidence"></span></div><div class="mapping" id="activityMapping"></div></div>
-   <div class="panel"><div class="panel-head"><div><div class="eyebrow">结果预览</div><h3>报名判断与人工修正</h3><p>系统判断有问题的商品可以手动填写报名价并勾选导出；手动价高于平台门槛时会被拦截。</p></div><div class="filters"><input id="activitySearch" placeholder="搜索 SKU 或商品"><select id="activityFilter"><option value="all">全部结果</option><option value="eligible">系统可报名</option><option value="manual">手动处理</option><option value="failed">不能报名/异常</option><option value="hero">主推商品</option><option value="early">早鸟价商品</option></select></div></div><div class="table-wrap"><table><thead><tr><th>结果</th><th>SKU</th><th>中文商品</th><th>当前价</th><th>平台门槛</th><th>内部控价</th><th>系统报名价</th><th>手动报名价</th><th>导出</th><th>差额</th><th>活动库存</th><th>原因</th></tr></thead><tbody id="activityTable"></tbody></table></div><div class="result-actions"><button class="btn light" id="exportActivityCsvBtn">导出完整分析 CSV</button><button class="btn primary" id="exportActivityBtn">下载最终报名原模板</button></div></div>
+   <div class="panel"><div class="panel-head"><div><div class="eyebrow">结果预览</div><h3>报名判断与人工修正</h3><p>系统判断有问题的商品可以手动填写报名价并勾选导出；手动价高于平台门槛时会被拦截。</p></div><div class="filters"><input id="activitySearch" placeholder="搜索 SKU 或商品"><select id="activityFilter"><option value="all">全部结果</option><option value="eligible">系统可报名</option><option value="manual">手动处理</option><option value="failed">不能报名/异常</option><option value="ratio_warning">低于提醒值</option><option value="hero">主推商品</option><option value="early">早鸟价商品</option></select></div></div><div class="table-wrap"><table><thead><tr><th>结果</th><th>SKU</th><th>中文商品</th><th>当前价</th><th>平台门槛</th><th>内部控价</th><th>系统报名价</th><th>报名价 ÷ 售价</th><th>手动报名价</th><th>导出</th><th>差额</th><th>活动库存</th><th>原因</th></tr></thead><tbody id="activityTable"></tbody></table></div><div id="activityPagination" class="result-actions" aria-label="活动预览分页"></div><div class="result-actions"><button class="btn light" id="exportActivityCsvBtn">导出完整分析 CSV</button><button class="btn primary" id="exportActivityBtn">下载最终报名原模板</button></div></div>
   </div>
  </section>
 
@@ -359,6 +359,7 @@ let state=loadState();
 let selectedStoreId=state.stores[0]?.id||'';
 let storeLinkFingerprint=JSON.stringify((state.stores||[]).map(store=>[store.id,store.name,store.active!==false]));
 let activitySession=null, repricingSession=null;
+let activityPage=1, activityViewCache=null;
 let currentMatchDatabaseId='';
 let repricingPage=1;
 let controlIndexCache=null;
@@ -411,12 +412,43 @@ function fillDatabaseSelects(){
 function renderDatabases(){const box=$('#databaseCards');if(!box)return;const current=selectedControlDatabaseId();box.innerHTML=(state.databases||[]).map(d=>{const n=(state.controlRecords||[]).filter(r=>(r.database_id||state.databases[0].id)===d.id).length;const c=(state.controlConflicts||[]).filter(r=>(r.database_id||state.databases[0].id)===d.id).length;return `<div class="store-card ${d.id===current?'selected':''}" data-db-card="${esc(d.id)}"><strong>${esc(d.name)}</strong><div class="meta">有效控价 ${n} · 冲突 ${c}<br>普通商品库 + 泳池专用库</div></div>`}).join('');$$('[data-db-card]').forEach(el=>el.onclick=()=>{$('#controlDatabase').value=el.dataset.dbCard;$('#controlImportDatabase').value=el.dataset.dbCard;renderControl();renderDatabases()})}
 function fillStoreSelects(){const opts=activeStores().map(s=>`<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');['#actStore','#repStore'].forEach(sel=>{const old=$(sel)?.value;if($(sel)){$(sel).innerHTML=opts;if(old&&activeStores().some(s=>s.id===old))$(sel).value=old}});$('#aliasStore').innerHTML='<option value="">全局适用</option>'+opts;$('#topStore').textContent=activeStores().length+' 个店铺';}
 function renderAll(){renderRepricingOptions();fillStoreSelects();fillDatabaseSelects();renderDashboard();renderStores();renderDatabases();renderControl();renderHistory();fillPresets();renderAppearance();renderTitleRules();renderActivityOptions()}
-function fillPresets(){const opts='<option value="">手动输入</option>'+state.presets.map(x=>`<option>${esc(x)}</option>`).join('');const old=$('#actPreset')?.value;if($('#actPreset')){$('#actPreset').innerHTML=opts;if(old)$('#actPreset').value=old}}
+// V17.1：预设用自绘列表提供独立删除按钮，隐藏 select 兼容旧工作流。
+function fillPresets(){
+ const select=$('#actPreset'),old=select.value;select.innerHTML='<option value="">手动输入</option>'+state.presets.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
+ select.value=state.presets.includes(old)?old:'';
+ $('#actPresetTrigger').innerHTML=`${esc(select.value||'手动输入')} <span>⌄</span>`;
+ $('#actPresetList').innerHTML='<div class="activity-preset-option"><button type="button" data-preset-select="">手动输入</button></div>'+state.presets.map(x=>`<div class="activity-preset-option"><button type="button" data-preset-select="${esc(x)}">${esc(x)}</button><button type="button" class="activity-preset-delete" data-preset-delete="${esc(x)}" aria-label="删除预设 ${esc(x)}" title="删除活动预设">×</button></div>`).join('');
+}
+$('#actPresetTrigger').onclick=()=>{
+ const list=$('#actPresetList'),trigger=$('#actPresetTrigger'),rect=trigger.getBoundingClientRect();
+ if(list.matches(':popover-open')){list.hidePopover();return}
+ list.style.width=rect.width+'px';list.style.left=rect.left+'px';list.style.top=(rect.bottom+6)+'px';list.showPopover();
+ const height=list.getBoundingClientRect().height;if(rect.bottom+6+height>innerHeight-12)list.style.top=Math.max(60,rect.top-height-6)+'px';
+};
+$('#actPresetList').addEventListener('toggle',()=>$('#actPresetTrigger').setAttribute('aria-expanded',String($('#actPresetList').matches(':popover-open'))));
+$('#actPresetList').onclick=e=>{
+ const remove=e.target.closest('[data-preset-delete]'),choice=e.target.closest('[data-preset-select]');
+ if(remove){const name=remove.dataset.presetDelete;state.presets=state.presets.filter(x=>x!==name);if($('#actPreset').value===name)$('#actPreset').value='';persistActivityPreferences();fillPresets();toast('已删除活动预设：'+name);return}
+ if(choice){$('#actPreset').value=choice.dataset.presetSelect;$('#actPreset').dispatchEvent(new Event('change'));fillPresets();$('#actPresetList').hidePopover()}
+};
+window.addEventListener('resize',()=>{if($('#actPresetList').matches(':popover-open'))$('#actPresetList').hidePopover()});
+$('.main').addEventListener('scroll',()=>{if($('#actPresetList').matches(':popover-open'))$('#actPresetList').hidePopover()},{passive:true});
+// 仅保存活动设置，避免每次改一个数字都重绘全站控价和店铺表格。
+function persistActivityPreferences(){try{localStorage.setItem({ph:'lazadaOpsPhilippinesSystemV8',th:'lazadaOpsThailandSystemV8'}[window.currentCountry],JSON.stringify(state))}catch(e){toast('保存失败：'+e.message,'err')}}
+function activityRatioWarningMinimum(){const value=state.activityPriceRatioWarning;return value!==null&&value!==''&&Number.isFinite(Number(value))&&Number(value)>=0?Number(value):0.95}
+function activityPriceRatio(x){const price=activityFinalPrice(x),current=x.currentPrice;return price!=null&&Number.isFinite(Number(price))&&Number(price)>=0&&current!=null&&Number.isFinite(Number(current))&&Number(current)>0?Number(price)/Number(current):null}
+function activityRatioWarns(x){const ratio=activityPriceRatio(x);return ratio!=null&&ratio<activityRatioWarningMinimum()}
+$('#activityPriceRatioWarning').onchange=()=>{
+ const input=$('#activityPriceRatioWarning'),raw=input.value.trim(),value=Number(raw);
+ if(raw===''||!Number.isFinite(value)||value<0){input.value=activityRatioWarningMinimum();toast('提醒值请输入不小于 0 的数字，例如 0.95','err');return}
+ state.activityPriceRatioWarning=value;persistActivityPreferences();activityViewCache=null;activityPage=1;if(activitySession)renderActivityResult();
+};
 function normalizeActivityFallbackRatio(value,fallback){const parsed=Number(value);return Number.isFinite(parsed)&&parsed>=0&&parsed<=10?Math.round(parsed*1000)/1000:fallback}
 function activityFallbackRatioValue(type){return type==='campaign'?normalizeActivityFallbackRatio(state.activityFallbackCampaignRatio,0.96):normalizeActivityFallbackRatio(state.activityFallbackRegularRatio,0.97)}
 function activityFallbackRatioLabel(value){const decimal=Number(value).toFixed(3).replace(/0+$/,'').replace(/\.$/,'');const percent=(Number(value)*100).toFixed(1).replace(/\.0$/,'');return `${decimal}（${percent}%）`}
 function renderActivityOptions(){
  const toggle=$('#activityThresholdFallback'),regular=$('#activityFallbackRegularRatio'),campaign=$('#activityFallbackCampaignRatio'),summary=$('#activityFallbackRatioSummary'),settings=$('#activityFallbackSettings');if(!toggle)return;
+ const warning=$('#activityPriceRatioWarning');if(warning&&document.activeElement!==warning)warning.value=activityRatioWarningMinimum();
  const enabled=state.activityThresholdFallback===true,regularValue=activityFallbackRatioValue('regular'),campaignValue=activityFallbackRatioValue('campaign');toggle.checked=enabled;
  if(regular&&document.activeElement!==regular)regular.value=regularValue.toFixed(3);if(campaign&&document.activeElement!==campaign)campaign.value=campaignValue.toFixed(3);if(settings)settings.style.opacity=enabled?'1':'.72';
  if(summary)summary.textContent=enabled?`规则已开启：平时活动最低 ${activityFallbackRatioLabel(regularValue)}，大促活动最低 ${activityFallbackRatioLabel(campaignValue)}；符合时按门槛价报名，不符合时剔除。`:`规则已关闭；当前保存值为平时 ${activityFallbackRatioLabel(regularValue)}、大促 ${activityFallbackRatioLabel(campaignValue)}，开启后生效。`;
@@ -521,16 +553,16 @@ function readActivityFallbackRatioInputs(){
  if(!Number.isFinite(regular)||regular<0||regular>10||!Number.isFinite(campaign)||campaign<0||campaign>10){toast('比例请输入0到10之间的数字，例如0.97。','err');renderActivityOptions();return null}
  return{regular:Math.round(regular*1000)/1000,campaign:Math.round(campaign*1000)/1000};
 }
-function saveActivityFallbackRatios(showMessage=true){const values=readActivityFallbackRatioInputs();if(!values)return false;state.activityFallbackRegularRatio=values.regular;state.activityFallbackCampaignRatio=values.campaign;saveState();if(showMessage)toast(`活动门槛比例已保存：平时 ${activityFallbackRatioLabel(values.regular)}，大促 ${activityFallbackRatioLabel(values.campaign)}`);return true}
+function saveActivityFallbackRatios(showMessage=true){const values=readActivityFallbackRatioInputs();if(!values)return false;state.activityFallbackRegularRatio=values.regular;state.activityFallbackCampaignRatio=values.campaign;persistActivityPreferences();renderActivityOptions();if(showMessage)toast(`活动门槛比例已保存：平时 ${activityFallbackRatioLabel(values.regular)}，大促 ${activityFallbackRatioLabel(values.campaign)}`);return true}
 $('#activityFallbackRegularRatio').onchange=()=>saveActivityFallbackRatios();
 $('#activityFallbackCampaignRatio').onchange=()=>saveActivityFallbackRatios();
-$('#activityThresholdFallback').onchange=()=>{const enabled=$('#activityThresholdFallback').checked,values=readActivityFallbackRatioInputs();if(!values){renderActivityOptions();return}state.activityFallbackRegularRatio=values.regular;state.activityFallbackCampaignRatio=values.campaign;state.activityThresholdFallback=enabled;saveState();toast(enabled?`门槛比例规则已开启：平时 ${activityFallbackRatioLabel(values.regular)}，大促 ${activityFallbackRatioLabel(values.campaign)}`:'未匹配 SKU 门槛比例规则已关闭')};
+$('#activityThresholdFallback').onchange=()=>{const enabled=$('#activityThresholdFallback').checked,values=readActivityFallbackRatioInputs();if(!values){renderActivityOptions();return}state.activityFallbackRegularRatio=values.regular;state.activityFallbackCampaignRatio=values.campaign;state.activityThresholdFallback=enabled;persistActivityPreferences();renderActivityOptions();toast(enabled?`门槛比例规则已开启：平时 ${activityFallbackRatioLabel(values.regular)}，大促 ${activityFallbackRatioLabel(values.campaign)}`:'未匹配 SKU 门槛比例规则已关闭')};
 $('#actPreset').onchange=()=>{if($('#actPreset').value)$('#actName').value=$('#actPreset').value};
-$('#addPresetBtn').onclick=()=>showModal('新增活动预设','<label>预设名称<input id="newPresetName" placeholder="例如：月中大促-品牌直播"></label>',()=>{const name=cleanText($('#newPresetName').value);if(!name)return toast('请输入预设名称','err');if(!state.presets.includes(name))state.presets.push(name);saveState();$('#actPreset').value=name;$('#actName').value=name;toast('活动预设已新增')});
+$('#addPresetBtn').onclick=()=>showModal('新增活动预设','<label>预设名称<input id="newPresetName" placeholder="例如：月中大促-品牌直播"></label>',()=>{const name=cleanText($('#newPresetName').value);if(!name)return toast('请输入预设名称','err');if(!state.presets.includes(name))state.presets.push(name);saveState();$('#actPreset').value=name;$('#actName').value=name;fillPresets();toast('活动预设已新增')});
 $('#analyzeActivityBtn').onclick=async()=>{
  const file=$('#activityFile').files[0];if(!file)return toast('请选择活动模板','err');const analysisCountry=window.currentCountry,analysisState=state,analysisRecords=state.controlRecords,analysisConflicts=state.controlConflicts,databaseId=$('#actDatabase').value;const btn=$('#analyzeActivityBtn');btn.disabled=true;btn.textContent='正在识别和计算…';
  try{
-  const wb=await openWorkbook(file);const m=await detectTemplate(wb,'activity');const sh=await getSheet(wb,wb.sheets.find(x=>x.path===m.sheetPath));const storeId=$('#actStore').value;currentMatchDatabaseId=databaseId;const type=$('#actType').value;const requested=$('#stockMode').value==='uniform'?toFloat($('#stockValue').value):null;const policy=$('#stockPolicy').value;const fallbackEnabled=$('#activityThresholdFallback').checked,fallbackRegularRatio=activityFallbackRatioValue('regular'),fallbackCampaignRatio=activityFallbackRatioValue('campaign');const results=[];
+  const wb=await openWorkbook(file);const m=await detectTemplate(wb,'activity');const sh=await getSheet(wb,wb.sheets.find(x=>x.path===m.sheetPath));const storeId=$('#actStore').value;currentMatchDatabaseId=databaseId;const type=$('#actType').value;const requested=$('#stockMode').value==='uniform'?toFloat($('#stockValue').value):null;const policy=$('#stockPolicy').value;const fallbackEnabled=$('#activityThresholdFallback').checked,fallbackRegularRatio=activityFallbackRatioValue('regular'),fallbackCampaignRatio=activityFallbackRatioValue('campaign');const results=[];controlIndexCache=new Map();
   for(let r=m.dataStartRow;r<=sh.maxRow;r++){
    if((r-m.dataStartRow)%100===0){await new Promise(resolve=>setTimeout(resolve,0));if(window.currentCountry!==analysisCountry||state!==analysisState||state.controlRecords!==analysisRecords||state.controlConflicts!==analysisConflicts||$('#actDatabase').value!==databaseId)throw new Error('国家或控价数据库已切换，请重新分析');currentMatchDatabaseId=databaseId}
    const sku=normalizeSku(cellValue(sh,r,m.skuCol));if(!sku)continue;const title=m.titleCol?cleanText(cellValue(sh,r,m.titleCol)):'';const current=m.currentPriceCol?toFloat(cellValue(sh,r,m.currentPriceCol)):null;const threshold=m.thresholdCol?parseThreshold(cellValue(sh,r,m.thresholdCol)):null;const stock=m.currentStockCol?toFloat(cellValue(sh,r,m.currentStockCol)):null;const hero=(m.heroCol&&isHeroValue(cellValue(sh,r,m.heroCol)))||isHero(storeId,sku);const meta=productMeta(storeId,sku);const early=!!meta?.isEarlyBird;const mt=matchControl(sku,storeId,title);const rec=mt.record;const out={rowNumber:r,sellerSku:sku,matchedSku:mt.matched,originalTitle:title,cn:rec?.product_name_cn||guessCn(title),currentPrice:current,thresholdPrice:threshold,internalPrice:null,suggestedPrice:null,manualPrice:null,manualInclude:false,priceGap:null,statusCode:'',reason:'',isHero:hero,isEarlyBird:early,currentStock:stock,campaignStock:null,matchMethod:mt.method,controlLibrary:mt.libraryType,fallbackRatio:null};
@@ -557,17 +589,43 @@ $('#analyzeActivityBtn').onclick=async()=>{
    }
    results.push(out);
   }
+  activityPage=1;activityViewCache=null;
   activitySession={country:analysisCountry,stateRef:analysisState,recordsRef:analysisRecords,conflictsRef:analysisConflicts,file,buffer:wb.buffer,wb,m,sh,results,counts:countStatuses(results),storeId,databaseId,type,fallbackEnabled,fallbackRegularRatio,fallbackCampaignRatio,taskName:cleanText($('#actName').value)||'活动报名',start:$('#actStart').value,end:$('#actEnd').value};renderActivityResult();$('#activityResult').classList.remove('hidden');$('#activityMsg').innerHTML=`<div class="callout good"><strong>分析完成</strong>${fallbackEnabled?`已启用未匹配 SKU 门槛比例规则（平时 ${activityFallbackRatioLabel(fallbackRegularRatio)} / 大促 ${activityFallbackRatioLabel(fallbackCampaignRatio)}）；`:'未匹配 SKU 门槛比例规则保持关闭；'}异常商品仍可在下方人工核对，最终保持平台原模板结构。</div>`;toast('活动模板分析完成');
  }catch(e){console.error(e);$('#activityMsg').innerHTML=`<div class="callout danger"><strong>处理失败</strong>${esc(e.message)}</div>`;toast(e.message,'err')}
- finally{btn.disabled=false;btn.textContent='识别模板并生成结果'}
+ finally{controlIndexCache=null;btn.disabled=false;btn.textContent='识别模板并生成结果'}
 };
 function countStatuses(rows){const c={total:rows.length};for(const r of rows)c[r.statusCode]=(c[r.statusCode]||0)+1;c.heroFailed=rows.filter(x=>x.isHero&&!activityCanExport(x)&&x.statusCode!=='update').length;c.earlyBird=rows.filter(x=>x.isEarlyBird).length;return c}
 function activityFinalPrice(x){return roundPrice(x.manualPrice!=null?x.manualPrice:x.suggestedPrice)}
 function activityCanExport(x){const p=activityFinalPrice(x);return !!x.manualInclude&&p!=null&&Number.isFinite(Number(p))&&Number(p)>0&&(x.thresholdPrice==null||Number(p)<=Number(x.thresholdPrice)+1e-8)}
 function activityExportRows(){return activitySession?activitySession.results.filter(activityCanExport):[]}
-function renderActivityResult(){const {m,sh,results}=activitySession;const counts=countStatuses(results);activitySession.counts=counts;const exportable=activityExportRows().length,manual=results.filter(x=>x.manualPrice!=null&&activityCanExport(x)).length;$('#activityMetrics').innerHTML=metricHtml([['处理商品',counts.total,'全部 SKU'],['最终导出',exportable,'含人工修正','good'],['人工修正',manual,'手动填写并勾选','warn'],['价格门槛不足',counts.price_gap||0,'可重新核价','danger'],['未匹配/冲突',(counts.unmatched||0)+(counts.control_conflict||0)+(counts.unmatched_combo||0)+(counts.battery_suffix_risk||0)+(counts.pool_control_missing||0),'默认不导出','danger'],['主推未导出',counts.heroFailed,'优先处理','warn']]);$('#activityConfidence').textContent='识别置信度：'+m.confidence;$('#activityMapping').innerHTML=mappingHtml(m,sh);renderActivityTable()}
-$('#activitySearch').oninput=renderActivityTable;$('#activityFilter').onchange=renderActivityTable;
-function renderActivityTable(){if(!activitySession)return;const q=cleanText($('#activitySearch').value).toLowerCase(),f=$('#activityFilter').value;let rows=activitySession.results.filter(x=>(!q||(window.__fuzzySearchV14?.matches?window.__fuzzySearchV14.matches(x.sellerSku+' '+x.cn+' '+x.originalTitle,q,'activitySearch'):(x.sellerSku+' '+x.cn+' '+x.originalTitle).toLowerCase().includes(q)))&&(f==='all'||x.statusCode===f||(f==='manual'&&x.manualPrice!=null)||(f==='failed'&&!activityCanExport(x))||(f==='hero'&&x.isHero)||(f==='early'&&x.isEarlyBird)));rows.sort((a,b)=>(b.isHero&&!activityCanExport(b))-(a.isHero&&!activityCanExport(a)));$('#activityTable').innerHTML=rows.map(x=>{const exported=activityCanExport(x),displayCode=x.manualPrice!=null&&exported?'manual_eligible':x.statusCode,si=statusInfo(displayCode),p=activityFinalPrice(x),invalid=x.manualPrice!=null&&x.thresholdPrice!=null&&Number(x.manualPrice)>Number(x.thresholdPrice)+1e-8;return `<tr class="row-${displayCode} ${x.isHero?'hero-row':''}"><td><span class="chip ${si[1]}">${si[0]}</span>${x.isHero?'<span class="hero-badge">主推</span>':''}${x.manualPrice!=null?'<span class="hero-badge manual-badge">手动价</span>':''}</td><td class="mono">${esc(x.sellerSku)}</td><td class="clip" title="${esc(x.originalTitle)}">${esc(x.cn)}</td><td>${money(x.currentPrice)}</td><td>${money(x.thresholdPrice)}</td><td>${money(x.internalPrice)}</td><td>${money(x.suggestedPrice)}</td><td><input class="manual-input activity-manual-price ${invalid?'invalid':''}" data-row="${x.rowNumber}" type="number" min="0" step="0.01" value="${x.manualPrice??''}" placeholder="${p??''}"></td><td><input class="apply-check activity-include" data-row="${x.rowNumber}" type="checkbox" ${x.manualInclude?'checked':''} ${p==null||Number(p)<=0||invalid?'disabled':''}></td><td>${x.priceGap==null?'—':money(x.priceGap)}</td><td>${num(x.campaignStock)}</td><td class="reason">${esc(x.reason)}${invalid?'<br><span style="color:var(--danger)">手动价高于平台门槛，不能导出。</span>':''}</td></tr>`}).join('')||'<tr><td colspan="12" class="empty">没有符合筛选条件的结果</td></tr>';$$('.activity-manual-price').forEach(inp=>inp.onchange=()=>{const row=activitySession.results.find(x=>x.rowNumber===Number(inp.dataset.row));const raw=cleanText(inp.value);row.manualPrice=raw===''?null:roundPrice(toFloat(raw));if(row.manualPrice!=null){row.manualInclude=row.thresholdPrice==null||Number(row.manualPrice)<=Number(row.thresholdPrice)+1e-8}else row.manualInclude=row.statusCode==='eligible';renderActivityResult()});$$('.activity-include').forEach(ch=>ch.onchange=()=>{const row=activitySession.results.find(x=>x.rowNumber===Number(ch.dataset.row));row.manualInclude=ch.checked;if(ch.checked&&!activityCanExport(row)){row.manualInclude=false;toast('该价格无效或高于平台门槛，暂时不能勾选导出。','err')}renderActivityResult()})}
+function renderActivityResult(){const {m,sh,results}=activitySession;const counts=countStatuses(results);activitySession.counts=counts;const exportable=activityExportRows().length,manual=results.filter(x=>x.manualPrice!=null&&activityCanExport(x)).length;$('#activityMetrics').innerHTML=metricHtml([['处理商品',counts.total,'全部 SKU'],['最终导出',exportable,'含人工修正','good'],['人工修正',manual,'手动填写并勾选','warn'],['价格门槛不足',counts.price_gap||0,'可重新核价','danger'],['未匹配/冲突',(counts.unmatched||0)+(counts.control_conflict||0)+(counts.unmatched_combo||0)+(counts.battery_suffix_risk||0)+(counts.pool_control_missing||0),'默认不导出','danger'],['低于提醒值',results.filter(activityRatioWarns).length,'报名价 ÷ 售价 < '+activityRatioWarningMinimum(),'danger']]);$('#activityConfidence').textContent='识别置信度：'+m.confidence;if(activitySession.mappingRendered!==m){$('#activityMapping').innerHTML=mappingHtml(m,sh);activitySession.mappingRendered=m}renderActivityTable()}
+// V17.1：只绘制当前 100 行；缓存筛选与排序结果，导出始终用 session 全量数据。
+let activitySearchTimer;
+$('#activitySearch').oninput=()=>{clearTimeout(activitySearchTimer);activitySearchTimer=setTimeout(()=>{activityPage=1;activityViewCache=null;renderActivityTable()},140)};
+$('#activityFilter').onchange=()=>{activityPage=1;activityViewCache=null;renderActivityTable()};
+function renderActivityTable(){
+ if(!activitySession)return;
+ const q=cleanText($('#activitySearch').value).toLowerCase(),f=$('#activityFilter').value;
+ if(!activityViewCache||activityViewCache.session!==activitySession||activityViewCache.q!==q||activityViewCache.f!==f){
+  const rows=activitySession.results.filter(x=>(!q||(window.__fuzzySearchV14?.matches?window.__fuzzySearchV14.matches(x.sellerSku+' '+x.cn+' '+x.originalTitle,q,'activitySearch'):(x.sellerSku+' '+x.cn+' '+x.originalTitle).toLowerCase().includes(q)))&&(f==='all'||x.statusCode===f||(f==='manual'&&x.manualPrice!=null)||(f==='failed'&&!activityCanExport(x))||(f==='hero'&&x.isHero)||(f==='early'&&x.isEarlyBird)||(f==='ratio_warning'&&activityRatioWarns(x))));
+  rows.sort((a,b)=>(b.isHero&&!activityCanExport(b))-(a.isHero&&!activityCanExport(a)));activityViewCache={session:activitySession,q,f,rows};
+ }
+ const rows=activityViewCache.rows,pages=Math.max(1,Math.ceil(rows.length/100));activityPage=Math.min(Math.max(1,activityPage),pages);
+ $('#activityTable').innerHTML=rows.slice((activityPage-1)*100,activityPage*100).map(x=>{
+  const exported=activityCanExport(x),displayCode=x.manualPrice!=null&&exported?'manual_eligible':x.statusCode,si=statusInfo(displayCode),p=activityFinalPrice(x),ratio=activityPriceRatio(x),warn=activityRatioWarns(x),invalid=x.manualPrice!=null&&x.thresholdPrice!=null&&Number(x.manualPrice)>Number(x.thresholdPrice)+1e-8;
+  const ratioText=ratio==null?'无法计算':(ratio*100).toFixed(2)+'%';
+  return `<tr class="row-${displayCode} ${x.isHero?'hero-row':''} ${warn?'activity-ratio-warning':''}" data-activity-row="${x.rowNumber}"><td><span class="chip ${si[1]}">${si[0]}</span>${x.isHero?'<span class="hero-badge">主推</span>':''}${x.manualPrice!=null?'<span class="hero-badge manual-badge">手动价</span>':''}${warn?'<span class="activity-warning-badge">低价提醒</span>':''}</td><td class="mono">${esc(x.sellerSku)}</td><td class="clip" title="${esc(x.originalTitle)}">${esc(x.cn)}</td><td>${money(x.currentPrice)}</td><td>${money(x.thresholdPrice)}</td><td>${money(x.internalPrice)}</td><td>${money(x.suggestedPrice)}</td><td class="activity-ratio-cell"><strong>${ratioText}</strong>${warn?`<small>低于 ${(activityRatioWarningMinimum()*100).toFixed(2)}%</small>`:ratio==null?'<small>缺少有效售价或报名价</small>':''}</td><td><input class="manual-input activity-manual-price ${invalid?'invalid':''}" data-row="${x.rowNumber}" type="number" min="0" step="0.01" value="${x.manualPrice??''}" placeholder="${p??''}"></td><td><input class="apply-check activity-include" data-row="${x.rowNumber}" type="checkbox" ${x.manualInclude?'checked':''} ${p==null||Number(p)<=0||invalid?'disabled':''}></td><td>${x.priceGap==null?'—':money(x.priceGap)}</td><td>${num(x.campaignStock)}</td><td class="reason">${esc(x.reason)}${warn?'<br><strong class="activity-ratio-note">报名价低于提醒比例，请核对后确认；不改变导出资格。</strong>':''}${invalid?'<br><span style="color:var(--danger)">手动价高于平台门槛，不能导出。</span>':''}</td></tr>`;
+ }).join('')||'<tr><td colspan="13" class="empty">没有符合筛选条件的结果</td></tr>';
+ $('#activityPagination').innerHTML=`<span>共 ${rows.length} 条 · 第 ${activityPage}/${pages} 页 · 每页 100 条 · 导出包含全部已勾选行</span><button class="btn light sm" data-activity-page="${activityPage-1}" ${activityPage<=1?'disabled':''}>上一页</button><button class="btn light sm" data-activity-page="${activityPage+1}" ${activityPage>=pages?'disabled':''}>下一页</button>`;
+}
+$('#activityPagination').onclick=e=>{const b=e.target.closest('[data-activity-page]');if(b&&!b.disabled){activityPage=Number(b.dataset.activityPage);renderActivityTable()}};
+$('#activityTable').onchange=e=>{
+ const input=e.target;if(!input.matches('.activity-manual-price,.activity-include')||!activitySession)return;
+ activitySession.rowLookup ||=new Map(activitySession.results.map(x=>[x.rowNumber,x]));const row=activitySession.rowLookup.get(Number(input.dataset.row));if(!row)return;
+ if(input.matches('.activity-manual-price')){const raw=cleanText(input.value);row.manualPrice=raw===''?null:roundPrice(toFloat(raw));row.manualInclude=row.manualPrice!=null?(row.thresholdPrice==null||Number(row.manualPrice)<=Number(row.thresholdPrice)+1e-8):row.statusCode==='eligible'}
+ else{row.manualInclude=input.checked;if(input.checked&&!activityCanExport(row)){row.manualInclude=false;toast('该价格无效或高于平台门槛，暂时不能勾选导出。','err')}}
+ activityViewCache=null;renderActivityResult();
+};
 
 async function preparePriceStyle(wb){if(wb.priceStyleContext)return wb.priceStyleContext;const path='xl/styles.xml',file=wb.zip.file(path);if(!file){wb.priceStyleContext={path,doc:null,cellXfs:null,cache:new Map(),dirty:false};return wb.priceStyleContext}const doc=parseXml(await file.async('string')),cellXfs=doc.getElementsByTagNameNS('*','cellXfs')[0]||null;wb.priceStyleContext={path,doc,cellXfs,cache:new Map(),dirty:false};return wb.priceStyleContext}
 function priceStyleIndex(wb,baseIndex=0){const ctx=wb.priceStyleContext;if(!ctx?.cellXfs)return null;baseIndex=Number.isFinite(Number(baseIndex))?Number(baseIndex):0;const key=String(baseIndex);if(ctx.cache.has(key))return ctx.cache.get(key);const xfs=[...ctx.cellXfs.children].filter(x=>x.localName==='xf'),base=xfs[baseIndex]||xfs[0];if(!base)return null;if(base.getAttribute('numFmtId')==='2'){ctx.cache.set(key,baseIndex);return baseIndex}const xf=base.cloneNode(true);xf.setAttribute('numFmtId','2');xf.setAttribute('applyNumberFormat','1');ctx.cellXfs.appendChild(xf);const idx=[...ctx.cellXfs.children].filter(x=>x.localName==='xf').length-1;ctx.cellXfs.setAttribute('count',String(idx+1));ctx.cache.set(key,idx);ctx.dirty=true;return idx}
@@ -682,7 +740,8 @@ renderAll();
   th:{id:'thailand',name:'泰国',label:'泰国系统',currency:'THB',symbol:'฿',locale:'th-TH'},
   my:{id:'malaysia',name:'马来西亚',label:'马来西亚系统',currency:'MYR',symbol:'RM ',locale:'en-MY'}
  };
- window.currentCountry=(COUNTRY_INFO[localStorage.getItem(COUNTRY_STORAGE_KEY)]?localStorage.getItem(COUNTRY_STORAGE_KEY):'ph');
+ // V17.1：暂停马来西亚入口；保留原存储键和迁移逻辑，不删除旧数据。
+ window.currentCountry=(['ph','th'].includes(localStorage.getItem(COUNTRY_STORAGE_KEY))?localStorage.getItem(COUNTRY_STORAGE_KEY):'ph');
 
  function countryInfo(){return COUNTRY_INFO[window.currentCountry]}
  window.currencySymbol=()=>countryInfo().symbol;
@@ -749,7 +808,7 @@ renderAll();
   const badge=document.getElementById('countryCurrencyBadge');if(badge)badge.textContent=info.symbol+' '+info.currency;
   const title=document.getElementById('fixedCountryDatabaseTitle');if(title)title.textContent=info.name+'控价数据库管理';
   const desc=document.getElementById('fixedCountryDatabaseDesc');if(desc)desc.textContent=`当前国家可建立多个独立控价数据库，例如本土店、跨境店或不同业务控价表；另一国家仍保存在完全独立的本地空间。`;
-  const note=document.getElementById('countryIsolationNote');if(note)note.innerHTML=`<strong>${info.name}数据独立</strong>当前国家内可新增多个控价数据库；菲律宾、泰国与马来西亚的数据库、店铺、关键词、SKU 规则和历史记录不会交叉。`;
+  const note=document.getElementById('countryIsolationNote');if(note)note.innerHTML=`<strong>${info.name}数据独立</strong>当前国家内可新增多个控价数据库；菲律宾与泰国的数据库、店铺、关键词、SKU 规则和历史记录不会交叉。`;
   const summary=document.getElementById('skuRuleSummary');
   if(summary)summary.innerHTML=window.currentCountry==='th'?'<strong>泰国 SKU 三步规则</strong>第一步统一删除末尾 S1–S9；第二步使用处理后的完整 SKU 精确匹配；第三步只对未匹配的 T/P 开头11位普通 SKU 提取第8位至末尾做尾码匹配，组合 SKU 不进入第三步。':'<strong>菲律宾 SKU 规则</strong>普通与泳池 SKU 删除末尾 S+数字；电池商品保留完整 SKU，菲律宾规则不会调用泰国尾码匹配。';
   const callout=document.getElementById('countrySkuRuleCallout');
@@ -760,13 +819,14 @@ renderAll();
   const search=document.getElementById('controlSearch');if(search)search.placeholder=window.currentCountry==='th'?'搜索 SKU、中文名或泰文商品名':'搜索 SKU、中文名称';
  }
  function resetTransientUI(){
+  if($('#actPresetList').matches(':popover-open'))$('#actPresetList').hidePopover();
   activitySession=null;repricingSession=null;currentMatchDatabaseId=state.databases?.[0]?.id||countryInfo().id;
   document.getElementById('activityResult')?.classList.add('hidden');document.getElementById('repricingResult')?.classList.add('hidden');
   document.getElementById('activityMsg').innerHTML='';document.getElementById('repricingMsg').innerHTML='';document.getElementById('controlImportMsg').innerHTML='';
   resetControlMapper();
  }
  function switchCountry(country){
-  if(!COUNTRY_INFO[country]||country===window.currentCountry)return;
+  if(!['ph','th'].includes(country)||country===window.currentCountry)return;
   try{localStorage.setItem(COUNTRY_STORAGE[window.currentCountry],JSON.stringify(state))}catch(e){}
   window.currentCountry=country;localStorage.setItem(COUNTRY_STORAGE_KEY,country);
   state=loadCountryState(country);selectedStoreId=state.stores[0]?.id||'';resetTransientUI();renderAll();updateCountryUI();go('dashboard');toast('已切换到'+countryInfo().label);

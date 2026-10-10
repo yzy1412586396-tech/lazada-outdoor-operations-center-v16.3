@@ -87,3 +87,19 @@
 .window-resize-handle.edge-se{bottom:0;right:0;width:14px;height:14px;cursor:se-resize}
 :root[data-window-maximized="true"] .window-resize-handle{display:none}
 :root.desktop-app[data-theme][data-effects] .brand-mark{background:#eef2f7!important;box-shadow:none!important}
+
+/* V17.1：预览风险颜色在所有主题下固定高对比，不进入 Excel 输出。 */
+html.desktop-app #activityTable tr.activity-ratio-warning>td{background:#ffe0e5!important;color:#76152b!important;border-bottom-color:#ef829b!important}
+html.desktop-app #activityTable tr.activity-ratio-warning>td:first-child{box-shadow:inset 5px 0 #d61f49!important}
+.activity-warning-badge{display:block;width:max-content;margin-top:5px;padding:3px 7px;border-radius:6px;background:#bc1740;color:#fff;font-weight:800;font-size:11px}
+.activity-ratio-cell{min-width:115px}.activity-ratio-cell small{display:block;margin-top:4px;font-size:11px}.activity-ratio-note{color:#a11135}
+.activity-toggle-line{cursor:default!important}.activity-toggle-line input[type=checkbox]{margin:0 9px 0 0;padding:0;width:14px;height:14px;min-width:14px;cursor:pointer}.activity-toggle-line span{cursor:default}
+.activity-field-label{display:block;margin-bottom:8px;font-weight:700;font-size:12px;color:var(--muted)}
+html.desktop-app .activity-preset-trigger{width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-input,12px);background:var(--surface);color:var(--text);font:inherit;text-align:left;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+.activity-preset-list{position:fixed;inset:auto;margin:0;padding:6px;max-height:min(300px,calc(100vh - 100px));overflow-y:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface,#fff);color:var(--text,#20314a);box-shadow:0 12px 35px #0003}
+.activity-preset-option{display:flex;align-items:center;gap:6px}.activity-preset-option button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:10px;text-align:left;border-radius:7px}.activity-preset-option button[data-preset-select]{flex:1;min-width:0;overflow-wrap:anywhere}.activity-preset-option button:hover{background:var(--surface2,#eef2ff)}.activity-preset-option .activity-preset-delete{flex:0 0 30px;padding:3px;font-size:21px;text-align:center;color:#d82950}
+html.desktop-app .v152-download-context{z-index:20030!important;inset:auto;margin:0;max-width:calc(100vw - 24px);-webkit-app-region:no-drag!important}
+html.desktop-app #activityTable tr.activity-ratio-warning .activity-ratio-cell strong,
+html.desktop-app #activityTable tr.activity-ratio-warning .activity-ratio-cell small,
+html.desktop-app #activityTable tr.activity-ratio-warning .activity-ratio-note{color:#76152b!important}
+html.desktop-app .activity-preset-trigger{font-weight:700}

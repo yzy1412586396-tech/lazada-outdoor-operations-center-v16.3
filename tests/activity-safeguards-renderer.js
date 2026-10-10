@@ -1,0 +1,34 @@
+async function(){
+ const check=(value,message)=>{if(!value)throw Error(message)},report={countries:[]};
+ const seed='{"country":"my","sentinel":"keep-existing-malaysia-data"}';localStorage.setItem('lazadaOpsMalaysiaSystemV8',seed);
+ check(!document.querySelector('[data-country="my"]'),'Malaysia entry removed');__opsDebug.switchCountry('my');check(currentCountry!=='my','Malaysia cannot activate');
+ for(const country of ['ph','th']){
+  __opsDebug.switchCountry(country);go('activity');
+  state.presets=['待删预设','保留预设'];state.controlConflicts=[];state.aliases=[];state.storeProducts={};state.titleRules={pool:{include:[],exclude:[]},battery:{include:[],exclude:[]}};
+  const db=state.databases[0].id,headers=['SellerSKU','商品名','售价','大促推荐价','大促价格','市场活动存货'],data=[headers];
+  state.controlRecords=Array.from({length:205},(_,i)=>{const price=i===0?90:i===1?95:i===2?96:90;data.push(['TEST'+String(i+1).padStart(7,'0'),'普通商品'+i,i===3?0:100,100,null,12]);return{sku:'TEST'+String(i+1).padStart(7,'0'),product_name_cn:'测试商品'+i,campaign_price:price,regular_price:price,la_price:price,library_type:'ordinary',database_id:db}});
+  saveState();$('#actType').value='campaign';$('#activityThresholdFallback').checked=false;$('#activityThresholdFallback').onchange();
+  const initial=state.activityThresholdFallback;document.querySelector('.activity-toggle-line').click();document.querySelector('.activity-toggle-line span').click();check(state.activityThresholdFallback===initial,'background/text cannot toggle');$('#activityThresholdFallback').click();check(state.activityThresholdFallback===!initial,'checkbox toggles');$('#activityThresholdFallback').click();
+  $('#actPresetTrigger').click();check($('#actPresetList').matches(':popover-open'),'preset opens top layer');$('#actPresetList [data-preset-select="待删预设"]').click();check($('#actPreset').value==='待删预设','preset selects');$('#actPresetTrigger').click();$('#actPresetList [data-preset-delete="待删预设"]').click();check(!state.presets.includes('待删预设')&&state.presets.includes('保留预设'),'preset independent delete');check($('#actPreset').value==='','deleted selected preset clears');$('#actPresetList').hidePopover();
+  $('#activityPriceRatioWarning').value='0.95';$('#activityPriceRatioWarning').onchange();
+  const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet(data),'活动');const notes=XLSX.utils.aoa_to_sheet([['hidden sentinel']]);XLSX.utils.book_append_sheet(book,notes,'隐藏');book.Workbook={Sheets:[{Hidden:0},{Hidden:1}]};
+  const bytes=XLSX.write(book,{bookType:'xlsx',type:'array'}),dt=new DataTransfer();dt.items.add(new File([bytes],'activity-safety.xlsx'));$('#activityFile').files=dt.files;
+  const begin=performance.now();await $('#analyzeActivityBtn').onclick();const analysisMs=performance.now()-begin;
+  check(activitySession?.results.length===205,'205 rows analyzed '+$('#activityMsg').textContent);const rows=activitySession.results;
+  check(activityRatioWarns(rows[0]),'90 below95 warns');check(!activityRatioWarns(rows[1]),'95 exact boundary no warning');check(!activityRatioWarns(rows[2]),'96 above95 no warning');check(activityPriceRatio(rows[3])===null,'zero denominator not infinity');check($('#activityTable').children.length===100,'DOM capped100');
+  const selectedBefore=activityExportRows().length,firstExport=await cloneAndPatch(activitySession,'activity');
+  $('#activityPagination [data-activity-page="2"]').click();check(activityPage===2,'second page');$('#activityPagination [data-activity-page="3"]').click();check($('#activityTable').children.length===5,'last page5');
+  activityPage=1;renderActivityTable();const manual=$('.activity-manual-price');manual.value='97';manual.dispatchEvent(new Event('change',{bubbles:true}));check(!activityRatioWarns(rows[0]),'manual97 clears warning');const manualAgain=$('.activity-manual-price');manualAgain.value='89';manualAgain.dispatchEvent(new Event('change',{bubbles:true}));check(activityRatioWarns(rows[0]),'manual89 warns');
+  $('#activityPriceRatioWarning').value='0.90';$('#activityPriceRatioWarning').onchange();check(!activityRatioWarns(rows[1]),'90 threshold reflected');check(activityRatioWarns(rows[0]),'89 below90');
+  $('#activityPriceRatioWarning').value='';$('#activityPriceRatioWarning').onchange();check(state.activityPriceRatioWarning===0.9,'blank invalid preserves setting');$('#activityPriceRatioWarning').value='0.95555';$('#activityPriceRatioWarning').onchange();check(state.activityPriceRatioWarning===0.95555,'arbitrary decimal retained');
+  $('#activityPriceRatioWarning').value=country==='ph'?'0.95':'0.90';$('#activityPriceRatioWarning').onchange();rows[0].manualPrice=null;rows[0].manualInclude=true;activityViewCache=null;renderActivityResult();
+  const finalExport=await cloneAndPatch(activitySession,'activity'),first=await JSZip.loadAsync(await firstExport.arrayBuffer()),last=await JSZip.loadAsync(await finalExport.arrayBuffer());
+  for(const name of Object.keys(first.files).filter(n=>!first.files[n].dir)){const a=await first.file(name).async('uint8array'),b=await last.file(name).async('uint8array');check(a.length===b.length&&a.every((x,i)=>x===b[i]),'preview setting cannot affect export '+name)}
+  const exported=await openWorkbook(await finalExport.arrayBuffer()),sh=await getSheet(exported,exported.sheets[0]);check(sh.maxRow===206,'full205 export despite preview page');check(cellValue(sh,1,5)==='大促价格'&&sh.maxCol===6,'no risk column exported');check(exported.sheets[1].state==='hidden','hidden sheet preserved');check(activityExportRows().length===selectedBefore,'warning does not change eligibility');
+  const savedSession=activitySession;activitySession={...savedSession,results:Array.from({length:10000},(_,i)=>({...rows[i%rows.length],rowNumber:i+2}))};activityViewCache=null;activityPage=1;
+  const p=performance.now();renderActivityResult();const initialPreviewMs=performance.now()-p;const timings=[];for(let i=2;i<=6;i++){activityPage=i;const t=performance.now();renderActivityTable();timings.push(performance.now()-t)}check($('#activityTable').children.length===100,'10k preview stays100');
+  check(initialPreviewMs<1500&&Math.max(...timings)<300,'bounded preview performance');activitySession=savedSession;activityViewCache=null;activityPage=1;renderActivityResult();
+  report.countries.push({country,rows:205,exported:205,analysisMs,initial10kPreviewMs:initialPreviewMs,pagingMs:timings,warningMinimum:state.activityPriceRatioWarning});
+ }
+ check(localStorage.getItem('lazadaOpsMalaysiaSystemV8')===seed,'MY data untouched');return report;
+}
