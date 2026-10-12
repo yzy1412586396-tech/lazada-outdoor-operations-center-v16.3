@@ -1,0 +1,27 @@
+const assert=require('node:assert/strict'),e=require('../app/inventory-engine-v15.js');
+const warehouses=[{id:'a',name:'CFS'},{id:'b',name:'高易'}];
+const store=(sku,extra={})=>({row:5,sku,skuId:'id-1',presale:'no',stocks:{a:50,b:0},...extra});
+const stock=(sku,a,b,name='户外帐篷2米3米米白色')=>({sku,name,stocks:{a,b}});
+const run=(stores,mabang,comboMap=new Map(),extra={})=>e.analyze({storeRows:stores,mabangRows:mabang,comboMap,warehouses,...extra});
+let r=run([store('T5HH1850591S2')],[stock('T5HH1850591',8,35)]).results[0];assert.equal(r.finalStocks.b,9999);assert.equal(r.finalStocks.a,null);assert.equal(r.finalSku,'T5HH1850591S2');
+r=run([store('T5HH1850591S2')],[stock('T5HH1850591',10,0),stock('T3HH2200591',11,0),stock('T7HH8310591',42,0)]).results[0];assert.equal(r.finalSku,'T7HH8310591S2');assert.equal(r.finalStocks.a,9999);
+r=run([store('T5HH1850591')],[stock('T5HH1850591',10,0),stock('T3HH2200591',10,0)]).results[0];assert.deepEqual(r.finalStocks,{a:null,b:null});assert(r.manual&&r.tags.includes('预售'));
+r=run([store('T5HH1850591',{presale:'yes'})],[stock('T5HH1850591',0,0),stock('T3HH2200591',42,0)]).results[0];assert.equal(r.changed,false);assert.deepEqual(r.finalStocks,{a:50,b:0});
+r=run([store('T5HH1850591',{presale:'unknown'})],[stock('T5HH1850591',42,0)]).results[0];assert.equal(r.changed,false);assert(r.manual);
+r=run([store('T5HH1850591',{stocks:{a:40,b:60}})],[stock('T5HH1850591',8,35)]);assert(r.audit.ok);assert.equal(r.results[0].finalStocks.a,null);assert.equal(r.results[0].finalStocks.b,9999);
+r=run([store('T5HH1850591',{presale:'yes',stocks:{a:40,b:60}})],[stock('T5HH1850591',8,35)]);assert(!r.audit.ok);assert(r.results[0].tags.includes('异常'));assert(!r.results[0].changed);
+const combo=new Map([['T3HH0623544X1',{name:'帐篷组合',components:[{sku:'T5HH1850591',quantity:3},{sku:'T4HH1234567',quantity:2}]}]]);
+r=run([store('T3HH0623544X1S1')],[stock('T5HH1850591',2,1),stock('T4HH1234567',2,0)],combo).results[0];assert(r.tags.includes('预售'));assert(!r.changed);
+r=run([store('T3HH0623544X1')],[stock('T5HH1850591',3,0),stock('T4HH1234567',0,2)],combo).results[0];assert(r.tags.includes('预售'),'both components must be in same physical warehouse');
+r=run([store('T3HH0623544X1')],[stock('T5HH1850591',3,0),stock('T4HH1234567',2,0)],combo).results[0];assert.equal(r.flow,'combo_healthy');assert(!r.changed);
+r=run([store('T3HH0623544X1')],[stock('T5HH1850591',3,0)],combo).results[0];assert(r.tags.includes('异常'));assert(!r.tags.includes('预售'),'missing source is not proved stockout');
+r=run([store('T5HH1850591')],[stock('T5HH1850591',5,0),stock('T5HH1850591',8,0)]).results[0];assert(!r.changed);assert(r.tags.includes('异常'),'conflicting duplicated stock cannot be summed');
+r=run([store('T5HH1850591')],[stock('T5HH1850591',6,0),stock('T5HH1850591',6,0)]).results[0];assert.equal(r.actualStock,6);assert(r.tags.includes('预售'),'identical duplicate not doubled');
+r=run([store('T5HH1850591',{status:'inactive'})],[stock('T5HH1850591',11,0)]).results[0];assert(r.tags.includes('未上架'));
+r=run([store('T5HH1850591')],[stock('T5HH1850591',3,0),stock('T3HH2200111',20,0)]).results[0];assert.equal(r.nameSuggestions.length,1);assert.equal(r.finalSku,'T5HH1850591');assert.equal(r.finalStocks.a,null);
+r=run([store('T5HH1850591S1'),store('T3HH2200591S1',{row:6,skuId:'id-2'})],[stock('T5HH1850591',3,0),stock('T3HH2200591',20,0)]);assert(r.audit.ok);assert.equal(r.results[0].flow,'manual_sku_collision');assert.equal(r.results[0].finalSku,'T5HH1850591S1');
+assert.equal(e.parseSku('T3HH0623544X1S12').canonical,'T3HH0623544X1');assert.equal(e.parseSku('V3HH0623544').kind,'ordinary');
+assert(e.nameSimilarity('户外帐篷2米3米米白色','户外帐篷2米3米黑色')<.95);
+// Same mapping pointing to different physical warehouses cannot make a healthy bundle.
+const physical=[{sku:'T5HH1850591',locations:[{key:'CFS-1',warehouseId:'a',stock:3,name:'CFS-1'}]},{sku:'T4HH1234567',locations:[{key:'CFS-2',warehouseId:'a',stock:2,name:'CFS-2'}]}];r=run([store('T3HH0623544X1')],physical,combo).results[0];assert(r.tags.includes('预售'));
+console.log('INVENTORY_V173_UNIT_OK');

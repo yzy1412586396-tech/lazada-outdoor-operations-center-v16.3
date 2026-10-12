@@ -11,12 +11,14 @@
     store: null,
     mabang: null,
     combo: null,
+    presale: null,
+    context: null,
     results: [],
     audit: null,
     storeId: '',
     filter: 'all',
     query: '',
-    visibleLimit: 200,
+    visibleLimit: 100,
     restoring: false,
     restoreToken: 0,
     exporting: false,
@@ -31,10 +33,11 @@
 
   function defaultConfig() {
     return {
-      version: 3,
-      threshold: 30,
+      version: 4,
+      threshold: 10,
       overflowValue: 9999,
-      storeSku: '', storeSkuHeader: '', storeTitle: '', storeTitleHeader: '', storeStatus: '', storeStatusHeader: '',
+      storeSku: '', storeSkuHeader: '', storeSkuId: '', storeSkuIdHeader: '',
+      presaleSkuId: '', presaleSkuIdHeader: '', presaleEnable: '', presaleEnableHeader: '', presaleSku: '', presaleSkuHeader: '', storeTitle: '', storeTitleHeader: '', storeStatus: '', storeStatusHeader: '',
       mabangSku: '', mabangSkuHeader: '', mabangName: '', mabangNameHeader: '', mabangWarehouse: '', mabangWarehouseHeader: '',
       warehouses: [
         { id: 'cfs', name: 'CFS', storeColumn: '', storeHeader: '', mabangStockColumn: '', mabangStockHeader: '', mabangValue: 'CFS' },
@@ -45,19 +48,19 @@
 
   function loadConfig() {
     try {
-      const saved = JSON.parse(localStorage.getItem(CONFIG_KEY) || localStorage.getItem(LEGACY_CONFIG_KEY) || 'null');
+      const saved = JSON.parse(localStorage.getItem(configKey()) || localStorage.getItem(CONFIG_KEY) || localStorage.getItem(LEGACY_CONFIG_KEY) || 'null');
       if (!saved || typeof saved !== 'object') return defaultConfig();
-      const merged = { ...defaultConfig(), ...saved, version: 3 };
-      merged.threshold = Math.max(0, engine.number(saved.threshold ?? 30));
-      merged.overflowValue = Math.max(1, engine.number(saved.overflowValue ?? 9999));
+      const merged = { ...defaultConfig(), ...saved, version: 4 };
+      merged.threshold = 10;
+      merged.overflowValue = 9999;
       merged.warehouses = Array.isArray(saved.warehouses) && saved.warehouses.length
         ? saved.warehouses.map((warehouse, index) => ({
           id: clean(warehouse.id) || `warehouse-${index + 1}`,
           name: clean(warehouse.name) || `仓库 ${index + 1}`,
           storeColumn: clean(warehouse.storeColumn),
           storeHeader: clean(warehouse.storeHeader),
-          mabangStockColumn: clean(warehouse.mabangStockColumn),
-          mabangStockHeader: clean(warehouse.mabangStockHeader),
+          mabangStockColumn: Number(saved.version)>=4?clean(warehouse.mabangStockColumn):'',
+          mabangStockHeader: Number(saved.version)>=4?clean(warehouse.mabangStockHeader):'',
           mabangValue: clean(warehouse.mabangValue),
         }))
         : defaultConfig().warehouses;
@@ -70,7 +73,7 @@
   let config = loadConfig();
 
   function saveConfig() {
-    localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+    localStorage.setItem(configKey(), JSON.stringify(config));
     window.desktopApp?.database?.flush();
   }
 
@@ -86,18 +89,20 @@
 
   function country() { return window.currentCountry || 'ph'; }
   function selectedStoreId() { return session.storeId || window.selectedStoreId || state?.stores?.[0]?.id || 'default'; }
+  function configKey() { return `${CONFIG_KEY}:${country()}:${selectedStoreId()}`; }
+  function contextKey() { return `${country()}:${selectedStoreId()}`; }
   function slotFor(kind) {
-    return kind === 'store'
-      ? `inventory-v15:${country()}:${selectedStoreId()}:store`
+    return ['store','presale'].includes(kind)
+      ? `inventory-v15:${country()}:${selectedStoreId()}:${kind}`
       : `inventory-v15:${country()}:shared:${kind}`;
   }
 
   function sourceLabel(kind) {
-    return { store: '店铺库存表', mabang: '马帮库存表', combo: '组合拆分表' }[kind] || kind;
+    return { store: '店铺库存表', mabang: '马帮库存表', combo: '组合拆分表', presale: '店铺预售表' }[kind] || kind;
   }
 
   function sourceScope(kind) {
-    if (kind === 'store') {
+    if (['store','presale'].includes(kind)) {
       const storeName = state?.stores?.find((store) => store.id === selectedStoreId())?.name || '当前店铺';
       return `${storeName} 独立保存`;
     }
@@ -175,18 +180,20 @@
         for (let column = 1; column <= Math.min(sheet.maxCol, 200); column += 1) {
           columns.push({ c: column, h: clean(cellValue(sheet, row, column)) });
         }
-        const skuScore = kind === 'store'
-          ? (findColumn(columns, ['SellerSKU', '卖家SKU'], true) ? 15 : (findColumn(columns, ['SKU']) ? 7 : 0))
-          : (findColumn(columns, ['库存SKU编号', 'SKU编号'], true) ? 15 : (findColumn(columns, ['SKU']) ? 7 : 0));
-        const otherScore = kind === 'store'
-          ? (findColumn(columns, ['库存']) ? 3 : 0) + (findColumn(columns, ['status', '状态']) ? 2 : 0)
-          : (findColumn(columns, ['仓库']) ? 4 : 0) + (findColumn(columns, ['库存']) ? 4 : 0);
+        const skuScore = kind === 'presale'
+          ? (findColumn(columns,['sku.skuId','SKU ID','skuId'],true) ? 15 : 0)
+          : kind === 'store' ? (findColumn(columns,['SellerSKU','卖家SKU'],true) ? 15 : 0)
+          : (findColumn(columns,['库存SKU编号','SKU编号'],true) ? 15 : 0);
+        const otherScore = kind === 'presale'
+          ? (findColumn(columns,['预售(相对天数) Enable','Pre-Order','Preorder','预售'],true) ? 8 : 0)
+          : kind === 'store' ? (findColumn(columns,['库存']) ? 3 : 0) + (findColumn(columns,['status','状态']) ? 2 : 0)
+          : (findColumn(columns,['仓库']) ? 4 : 0) + (findColumn(columns,['库存']) ? 4 : 0);
         const score = skuScore + otherScore;
         if (!best || score > best.score) best = { score, workbook, definition, sheet, row, columns };
       }
     }
-    if (!best || best.score < 7) throw new Error(kind === 'store' ? '没有识别到店铺 SellerSKU 表头' : '没有识别到马帮库存 SKU 表头');
-    const skuColumn = kind === 'store'
+    if (!best || best.score < 15) throw new Error(kind === 'store' ? '没有识别到店铺 SellerSKU 表头' : '没有识别到马帮库存 SKU 表头');
+    const skuColumn = kind === 'presale' ? findColumn(best.columns,['SellerSKU'],true) : kind === 'store'
       ? (findColumn(best.columns, ['SellerSKU', '卖家SKU'], true) || findColumn(best.columns, ['SKU']))
       : (findColumn(best.columns, ['库存SKU编号', 'SKU编号'], true) || findColumn(best.columns, ['SKU']));
     best.dataStartRow = best.row + 1;
@@ -252,12 +259,12 @@
         const suffix = relation.header.match(/(\d*)$/)?.[1] || '1';
         const quantityColumn = quantityColumns.get(suffix);
         const rawQuantity = quantityColumn ? cellValue(detected.sheet, row, quantityColumn) : 1;
-        const quantity = clean(rawQuantity) === '' ? 1 : engine.number(rawQuantity);
+        const quantity = quantityColumn&&clean(rawQuantity)!=='' ? engine.number(rawQuantity) : 0;
         if (componentInfo.kind !== 'ordinary') {
           invalidReason = `组件 ${rawComponent} 不是有效的 11 位普通 SKU`;
           break;
         }
-        if (!Number.isFinite(quantity) || quantity <= 0) {
+        if (!Number.isInteger(quantity) || quantity <= 0) {
           invalidReason = `组件 ${componentInfo.canonical} 的捆绑数量无效`;
           break;
         }
@@ -292,6 +299,7 @@
         conflicts.push(sku);
       }
     }
+    for(const invalid of invalidRows){const key=engine.parseSku(invalid.sku);if(key.kind==='combo')comboMap.set(key.canonical,{invalid:true,components:[],reason:invalid.reason});}
     if (!comboMap.size && !invalidRows.length) throw new Error('组合拆分表中没有可用数据。');
     return {
       workbook,
@@ -311,6 +319,8 @@
     const columns = data.columns;
     if (kind === 'store') {
       config.storeSku = resolveColumn(columns, config.storeSku, config.storeSkuHeader, ['SellerSKU', '卖家SKU', 'SKU']);
+      config.storeSkuId = resolveColumn(columns, config.storeSkuId, config.storeSkuIdHeader, ['sku.skuId','SKU ID','skuId']);
+      config.storeSkuIdHeader = headerFor(columns,config.storeSkuId);
       config.storeTitle = resolveColumn(columns, config.storeTitle, config.storeTitleHeader, ['商品标题', '产品名称', 'title']);
       config.storeStatus = resolveColumn(columns, config.storeStatus, config.storeStatusHeader, ['status', '商品状态', '状态']);
       config.storeSkuHeader = headerFor(columns, config.storeSku);
@@ -320,6 +330,10 @@
         warehouse.storeColumn = resolveColumn(columns, warehouse.storeColumn, warehouse.storeHeader, [warehouse.name]);
         warehouse.storeHeader = headerFor(columns, warehouse.storeColumn);
       }
+    } else if (kind === 'presale') {
+      for (const [key,guesses] of [['presaleSkuId',['sku.skuId','SKU ID','skuId']],['presaleEnable',['预售(相对天数) Enable','Pre-Order','Preorder','预售']],['presaleSku',['SellerSKU']]]) {
+        config[key]=resolveColumn(columns,config[key],config[key+'Header'],guesses);config[key+'Header']=headerFor(columns,config[key]);
+      }
     } else {
       config.mabangSku = resolveColumn(columns, config.mabangSku, config.mabangSkuHeader, ['库存SKU编号', 'SKU编号', 'SKU']);
       config.mabangName = resolveColumn(columns, config.mabangName, config.mabangNameHeader, ['中文名称', '商品名称', '产品名称']);
@@ -328,7 +342,7 @@
       config.mabangNameHeader = headerFor(columns, config.mabangName);
       config.mabangWarehouseHeader = headerFor(columns, config.mabangWarehouse);
       for (const warehouse of config.warehouses) {
-        warehouse.mabangStockColumn = resolveColumn(columns, warehouse.mabangStockColumn, warehouse.mabangStockHeader, ['可用库存', '仓位库存', `${warehouse.name}库存`, '库存']);
+        warehouse.mabangStockColumn = resolveColumn(columns, warehouse.mabangStockColumn, warehouse.mabangStockHeader, ['可用库存量', '可用库存', 'Available Stock', `${warehouse.name}可用库存`]);
         warehouse.mabangStockHeader = headerFor(columns, warehouse.mabangStockColumn);
       }
     }
@@ -345,20 +359,20 @@
   }
 
   function renderSourceStatuses() {
-    for (const kind of ['store', 'mabang', 'combo']) {
+    for (const kind of ['store', 'mabang', 'presale', 'combo']) {
       const target = q(`#inv15${kind[0].toUpperCase()}${kind.slice(1)}Status`);
       if (target) target.innerHTML = sourceStatusHtml(kind);
       const clearButton = q(`[data-inv15-clear="${kind}"]`);
       if (clearButton) clearButton.disabled = !session[kind];
     }
-    const ready = ['store', 'mabang', 'combo'].filter((kind) => session[kind]).length;
+    const ready = ['store', 'mabang', 'presale', 'combo'].filter((kind) => session[kind]).length;
     const badge = q('#inv15KnowledgeReady');
     if (badge) {
-      badge.textContent = `${ready} / 3 已就绪`;
-      badge.className = `chip ${ready === 3 ? 'good' : 'warn'}`;
+      badge.textContent = `${ready} / 4 已就绪`;
+      badge.className = `chip ${ready === 4 ? 'good' : 'warn'}`;
     }
     const button = q('#inv15Analyze');
-    if (button) button.disabled = ready !== 3;
+    if (button) button.disabled = ready !== 4 || session.restoring;
   }
 
   async function parseSource(kind, buffer) {
@@ -369,11 +383,13 @@
     if (!file) return;
     const status = q(`#inv15${kind[0].toUpperCase()}${kind.slice(1)}Status`);
     const scrollTop = window.scrollY;
+    const sourceContext=contextKey(),slot=slotFor(kind);
     if (status) status.innerHTML = '<div class="inv15-source-loading"><i></i><b>正在校验并保存到本机知识库…</b></div>';
     try {
       const buffer = await file.arrayBuffer();
       const parsed = await parseSource(kind, buffer);
-      const record = await window.desktopApp.uploads.save(slotFor(kind), {
+      if(sourceContext!==contextKey())throw Error('店铺或国家已切换，请在目标店铺重新上传');
+      const record = await window.desktopApp.uploads.save(slot, {
         name: file.name,
         type: file.type || MIME_XLSX,
         lastModified: file.lastModified || Date.now(),
@@ -384,6 +400,7 @@
         size: file.size,
         updatedAt: record?.updatedAt || new Date().toISOString(),
       });
+      if(sourceContext!==contextKey())return;
       session[kind] = parsed;
       if (kind !== 'combo') applySavedMappings(kind, parsed);
       clearAnalysis();
@@ -431,13 +448,13 @@
     session.restoring = true;
     renderSourceStatuses();
     if (options.storeOnly) {
-      session.store = null;
-      await restoreSource('store', token);
+      session.store = null;session.presale=null;
+      await Promise.all(['store','presale'].map(kind=>restoreSource(kind,token)));
     } else {
       session.store = null;
       session.mabang = null;
-      session.combo = null;
-      await Promise.all(['store', 'mabang', 'combo'].map((kind) => restoreSource(kind, token)));
+      session.combo = null;session.presale=null;
+      await Promise.all(['store', 'mabang', 'presale', 'combo'].map((kind) => restoreSource(kind, token)));
     }
     if (token !== session.restoreToken) return;
     session.restoring = false;
@@ -446,7 +463,9 @@
   }
 
   async function clearSource(kind) {
-    await window.desktopApp.uploads.remove(slotFor(kind));
+    const sourceContext=contextKey(),slot=slotFor(kind);
+    await window.desktopApp.uploads.remove(slot);
+    if(sourceContext!==contextKey())return;
     session[kind] = null;
     clearAnalysis();
     renderAllInventory();
@@ -481,8 +500,11 @@
     const mabangColumns = session.mabang?.columns || [];
     const storeBox = q('#inv15StoreBaseMap');
     const mabangBox = q('#inv15MabangBaseMap');
+    const presaleBox=q('#inv15PresaleBaseMap');
+    if(presaleBox)presaleBox.innerHTML=[['presaleSkuId','SKU ID（必选）'],['presaleEnable','预售 Yes / No（必选）'],['presaleSku','SellerSKU（核对）']].map(([key,label])=>`<label>${label}<select data-inv15-base="${key}">${columnOptions(session.presale?.columns||[],config[key])}</select></label>`).join('');
     if (storeBox) storeBox.innerHTML = `
       <label>SellerSKU（必选）<select data-inv15-base="storeSku">${columnOptions(storeColumns, config.storeSku)}</select></label>
+      <label>SKU ID（关联预售）<select data-inv15-base="storeSkuId">${columnOptions(storeColumns, config.storeSkuId)}</select></label>
       <label>店铺商品标题<select data-inv15-base="storeTitle">${columnOptions(storeColumns, config.storeTitle)}</select></label>
       <label>Status 状态<select data-inv15-base="storeStatus">${columnOptions(storeColumns, config.storeStatus)}</select></label>`;
     if (mabangBox) mabangBox.innerHTML = `
@@ -545,7 +567,7 @@
   function updateBaseMapping(element) {
     const key = element.dataset.inv15Base;
     config[key] = element.value;
-    const columns = key.startsWith('store') ? session.store?.columns : session.mabang?.columns;
+    const columns = key.startsWith('store') ? session.store?.columns : key.startsWith('presale') ? session.presale?.columns : session.mabang?.columns;
     config[`${key}Header`] = headerFor(columns, element.value);
     if (key === 'mabangWarehouse' && session.mabang) session.mabang.valueCache.clear();
     saveConfig();
@@ -569,30 +591,50 @@
       const sku = clean(cellValue(data.sheet, row, Number(config.mabangSku)));
       if (!sku) continue;
       const name = config.mabangName ? clean(cellValue(data.sheet, row, Number(config.mabangName))) : '';
-      const warehouseName = config.mabangWarehouse ? clean(cellValue(data.sheet, row, Number(config.mabangWarehouse))).toLowerCase() : '';
-      const stocks = {};
-      for (const warehouse of warehouses) {
-        const accepted = normalizedWarehouseValues(warehouse.mabangValue);
-        stocks[warehouse.id] = !engine.warehouseNameMatches(warehouseName, accepted)
-          ? 0
-          : engine.number(cellValue(data.sheet, row, Number(warehouse.mabangStockColumn)));
+      const warehouseName = config.mabangWarehouse ? clean(cellValue(data.sheet, row, Number(config.mabangWarehouse))) : '';
+      const locations=[];
+      for(const warehouse of warehouses){
+        const accepted=normalizedWarehouseValues(warehouse.mabangValue);
+        if(engine.warehouseNameMatches(warehouseName,accepted))locations.push({key:warehouseName||warehouse.id,warehouseId:warehouse.id,name:warehouseName||warehouse.name,stock:cellValue(data.sheet,row,Number(warehouse.mabangStockColumn))});
       }
-      rows.push({ row, sku, name, stocks });
+      rows.push({row,sku,name,locations});
     }
     return rows;
   }
 
+  function stockWarehouses() {
+    const mapped=mappedWarehouses(),seen=new Set(mapped.map(w=>Number(w.storeColumn)));
+    // Include all stock columns in checks/exports, even when unused warehouse mappings are absent.
+    return mapped.concat((session.store?.columns||[]).filter(c=>!seen.has(c.c)&&/仓|warehouse/i.test(c.h)&&!/SKU|状态|status/i.test(c.h)).map(c=>({id:'unmapped-'+c.c,name:c.h,storeColumn:String(c.c)})));
+  }
+
+  function readPresaleIndex() {
+    if(!config.presaleSkuId||!config.presaleEnable)throw Error('预售表必须选择 SKU ID 和 Yes / No 列');
+    const index=new Map(),data=session.presale;
+    for(let row=data.dataStartRow;row<=data.sheet.maxRow;row++){
+      const id=clean(cellValue(data.sheet,row,Number(config.presaleSkuId)));if(!id)continue;
+      const raw=clean(cellValue(data.sheet,row,Number(config.presaleEnable))).toLowerCase();
+      const value=['yes','是','true','1'].includes(raw)?'yes':['no','否','false','0'].includes(raw)?'no':'unknown';
+      const sku=config.presaleSku?clean(cellValue(data.sheet,row,Number(config.presaleSku))):'';
+      const old=index.get(id);index.set(id,old&&(old.value!==value||old.sku!==sku)?{value:'unknown',sku:'',reason:'预售表相同 SKU ID 存在冲突'}:{value,sku,row});
+    }
+    return index;
+  }
+
   function readStoreRows(warehouses) {
     const data = session.store;
-    if (!config.storeSku) throw new Error('店铺库存表必须选择 SellerSKU 列');
+    if (!config.storeSku || !config.storeSkuId) throw new Error('店铺库存表必须选择 SellerSKU 和 SKU ID 列');
+    const presales=readPresaleIndex();
     const rows = [];
     for (let row = data.dataStartRow || data.row + 1; row <= data.sheet.maxRow; row += 1) {
       const sku = clean(cellValue(data.sheet, row, Number(config.storeSku)));
       if (!sku) continue;
       const stocks = Object.fromEntries(warehouses.map((warehouse) => [warehouse.id, cellValue(data.sheet, row, Number(warehouse.storeColumn))]));
+      const skuId=clean(cellValue(data.sheet,row,Number(config.storeSkuId))),pre=presales.get(skuId);
+      const stale=pre?.sku&&engine.normalizeRawSku(pre.sku)!==engine.normalizeRawSku(sku);
       rows.push({
         row,
-        sku,
+        sku,skuId,presale:stale?'unknown':pre?.value||'unknown',presaleReason:stale?'预售表同 SKU ID 的 SellerSKU 与店铺表不同，请更新表格':pre?.reason||'预售状态缺失或无法识别',
         title: config.storeTitle ? clean(cellValue(data.sheet, row, Number(config.storeTitle))) : '',
         status: config.storeStatus ? clean(cellValue(data.sheet, row, Number(config.storeStatus))) : '',
         stocks,
@@ -603,45 +645,52 @@
 
   function clearAnalysis() {
     session.results = [];
-    session.audit = null;
-    session.visibleLimit = 200;
+    session.audit = null;session.context=null;
+    if(q('#inv15ExportWorkbook'))q('#inv15ExportWorkbook').disabled=true;
+    if(q('#inv15ExportManual'))q('#inv15ExportManual').disabled=true;
+    session.visibleLimit = 100;session.page=1;
     const list = q('#inv15ResultList');
-    if (list) list.innerHTML = '<div class="inv15-empty">三个知识库就绪后，点击“执行 V15 库存识别”。</div>';
+    if (list) list.innerHTML = '<div class="inv15-empty">四张表就绪后，点击“执行库存识别”。</div>';
     if (q('#inv15Metrics')) q('#inv15Metrics').innerHTML = '';
     if (q('#inv15ResultCount')) q('#inv15ResultCount').textContent = '尚未分析';
     if (q('#inv15Audit')) q('#inv15Audit').innerHTML = '';
   }
 
   async function analyzeInventory() {
-    if (!session.store || !session.mabang || !session.combo) return toast('请先让三个表格知识库全部就绪', 'err');
+    if (!session.store || !session.mabang || !session.presale || !session.combo) return toast('请先让四张表格知识库全部就绪', 'err');
     const warehouses = mappedWarehouses();
     if (!warehouses.length) return toast('请至少完成一个仓库的店铺列与马帮列映射', 'err');
+    const analysisContext=contextKey();
     const button = q('#inv15Analyze');
     button.disabled = true;
     button.textContent = '正在执行规则并复核…';
     await new Promise((resolve) => requestAnimationFrame(resolve));
     try {
-      config.threshold = Math.max(0, engine.number(q('#inv15Threshold').value || 30));
-      config.overflowValue = Math.max(1, engine.number(q('#inv15Overflow').value || 9999));
+      if(analysisContext!==contextKey()||session.restoring)throw Error('店铺或国家已切换，请重新执行识别');
+      if(new Set(warehouses.map(w=>w.storeColumn)).size!==warehouses.length)throw Error('多个仓库映射使用了同一店铺库存列');
+      if(warehouses.some(w=>!w.mabangValue)||!config.mabangWarehouse)throw Error('请设置马帮仓库名称列和每个仓库的匹配关键字');
+      config.threshold = 10;config.overflowValue = 9999;
+      const scope=contextKey();
       saveConfig();
       const analysis = engine.analyze({
-        storeRows: readStoreRows(warehouses),
+        storeRows: readStoreRows(stockWarehouses()),
+        stockWarehouses: stockWarehouses(),
         mabangRows: readMabangRows(warehouses),
         comboMap: session.combo.comboMap,
         warehouses,
         threshold: config.threshold,
         overflowValue: config.overflowValue,
       });
-      session.results = analysis.results;
+      session.context=scope;session.results = analysis.results;
       session.audit = analysis.audit;
-      session.visibleLimit = 200;
+      session.visibleLimit = 100;session.page=1;
       renderResults();
       toast(`识别完成：${analysis.audit.changedRows} 行将更新，${analysis.audit.unresolvedRows} 行需人工处理`, analysis.audit.ok ? 'ok' : 'err');
     } catch (error) {
       console.error(error);
       toast(`库存识别失败：${error.message}`, 'err');
     } finally {
-      button.textContent = '执行 V15 库存识别';
+      button.textContent = '执行库存识别';
       renderSourceStatuses();
     }
   }
@@ -654,8 +703,9 @@
     manual_combo_component_stock: '组合组件缺货',
     manual_combo_definition: '组合定义异常',
     manual_multi_store_warehouse: '店铺多仓异常',
-    manual_no_stock: '全仓无货',
+    manual_no_stock: '库存不足 · 已清空',
     manual_invalid_sku: 'SKU 格式异常',
+    presale_unchanged:'已开预售 · 保持原样',manual_presale_unknown:'预售状态待核对',manual_mabang_unknown:'马帮库存待核对',manual_unmapped_stock:'仓库映射待补全',manual_sku_collision:'替换 SKU 重复',
     unchanged: '保持原样',
   };
 
@@ -724,7 +774,7 @@
       ? `<code>${escapeHtml(result.originalSku)}</code><span class="inv15-arrow">→</span><code class="changed">${escapeHtml(result.finalSku)}</code>`
       : `<code>${escapeHtml(result.originalSku)}</code>`;
     const title = result.title || '店铺表未提供标题';
-    const mabang = result.mabangName ? `<small>马帮：${escapeHtml(result.mabangName)}</small>` : '<small>马帮：无名称或未匹配</small>';
+    const mabang = result.mabangName ? `<small title="${escapeHtml(result.mabangName)}">马帮：${escapeHtml(result.mabangName)}</small>` : '<small>马帮：无名称或未匹配</small>';
     const components = result.componentChecks.length
       ? `<div class="inv15-components">${result.componentChecks.map((item) => `<span class="${item.ok ? 'ok' : 'bad'}">${escapeHtml(item.sku)} · ${item.available}/${item.quantity}</span>`).join('')}</div>`
       : '';
@@ -734,17 +784,17 @@
         <span class="inv15-row-number">原表第 ${result.row} 行</span>
       </div>
       <div class="inv15-result-grid">
-        <div class="inv15-result-cell sku"><label>SellerSKU</label><div class="inv15-sku-change">${skuChange}</div><p>${escapeHtml(title)}</p>${mabang}</div>
+        <div class="inv15-result-cell sku"><label>SellerSKU</label><div class="inv15-sku-change">${skuChange}</div><p title="${escapeHtml(title)}">${escapeHtml(title)}</p><small>SKU ID：${escapeHtml(result.skuId)} · 预售：${result.presale==='yes'?'Yes':result.presale==='no'?'No':'未知'}</small>${mabang}</div>
         <div class="inv15-result-cell"><label>店铺原库存</label><div class="inv15-stock-stack">${stockText(result.originalStocks, warehouses)}</div></div>
         <div class="inv15-result-cell"><label>最终写入库存</label><div class="inv15-stock-stack">${stockText(result.finalStocks, warehouses)}</div></div>
-        <div class="inv15-result-cell reason"><label>判定明细</label><div>${result.reasons.map((reason) => `<p>• ${escapeHtml(reason)}</p>`).join('')}</div>${components}</div>
+        <div class="inv15-result-cell reason"><label>判定明细</label><div>${result.reasons.map((reason) => `<p>• ${escapeHtml(reason)}</p>`).join('')}</div>${components}${result.nameSuggestions?.length?`<div class="inv15-name-suggestions"><b>中文名称候选（仅供人工确认）</b>${result.nameSuggestions.map(c=>`<p>${escapeHtml(c.sku)} · ${escapeHtml(c.name)} · ${(c.score*100).toFixed(1)}% · ${escapeHtml(c.warehouse)} ${c.stock}件</p>`).join('')}</div>`:''}</div>
       </div>
     </article>`;
   }
 
   function renderResults() {
     if (!session.results.length) return clearAnalysis();
-    const warehouses = mappedWarehouses();
+    const warehouses = stockWarehouses();
     const counts = resultCounts();
     q('#inv15Metrics').innerHTML = [
       metricButton('all', '全部 SKU', counts.all),
@@ -759,16 +809,18 @@
       metricButton('combo', '组合 SKU', counts.combo),
     ].join('');
     const filtered = filteredResults();
-    const visible = filtered.slice(0, session.visibleLimit);
+    const pages=Math.max(1,Math.ceil(filtered.length/100));session.page=Math.min(session.page||1,pages);
+    const visible = filtered.slice((session.page-1)*100,session.page*100);
     q('#inv15ResultCount').textContent = `当前 ${filtered.length} / 全部 ${session.results.length}`;
     q('#inv15ResultList').innerHTML = visible.length ? visible.map((result) => resultRowHtml(result, warehouses)).join('') : '<div class="inv15-empty">当前筛选没有结果。</div>';
-    q('#inv15More').innerHTML = filtered.length > visible.length ? `<button class="btn light" id="inv15MoreButton">继续显示 ${Math.min(200, filtered.length - visible.length)} 条</button>` : '';
-    q('#inv15MoreButton')?.addEventListener('click', () => { session.visibleLimit += 200; renderResults(); });
+    q('#inv15More').innerHTML=`<span>第 ${session.page}/${pages} 页 · 每页100条 · 导出包含全部结果</span><button class="btn light" id="inv15Prev" ${session.page===1?'disabled':''}>上一页</button><button class="btn light" id="inv15Next" ${session.page===pages?'disabled':''}>下一页</button>`;
+    q('#inv15Prev').onclick=()=>{session.page--;renderResults()};q('#inv15Next').onclick=()=>{session.page++;renderResults()};
     const audit = session.audit;
     q('#inv15Audit').innerHTML = audit?.ok
-      ? `<div class="inv15-audit good"><b>✓ 最终规则复核通过</b><span>${audit.changedRows} 行自动更新；${audit.unresolvedRows} 行保持原样并进入人工名单；导出时还会重新读取成品 Excel 验证格式。</span></div>`
+      ? `<div class="inv15-audit good"><b>✓ 最终规则复核通过</b><span>${audit.changedRows} 行自动更新；${audit.unresolvedRows} 行需人工处理（包含已清空库存的缺货行）；导出时还会重新读取成品 Excel 验证格式。</span></div>`
       : `<div class="inv15-audit danger"><b>最终规则复核未通过</b><span>${audit?.failures?.map((item) => `第${item.row}行：${item.reason}`).join('；') || '未知错误'}</span></div>`;
     q('#inv15ExportWorkbook').disabled = !audit?.ok;
+    q('#inv15ExportReview').hidden=!!audit?.ok;
     q('#inv15ExportManual').disabled = !counts.manual;
   }
 
@@ -777,11 +829,12 @@
   }
 
   function exportManualList() {
-    const warehouses = mappedWarehouses();
+    const warehouses = stockWarehouses();
     const rows = session.results.filter((result) => result.manual);
     if (!rows.length) return toast('当前没有需人工处理的 SKU', 'err');
-    const headers = ['原表行号', '标签', '原SellerSKU', '最终SellerSKU', '店铺标题', '马帮商品名称', 'Status', '处理流程', '原库存', '最终库存', '原因'];
+    const headers = ['SKU ID','预售状态','当前马帮仓库可用量','同款查询结果','中文候选（仅供人工确认）','组合组件明细','来源文件','原表行号', '标签', '原SellerSKU', '最终SellerSKU', '店铺标题', '马帮商品名称', 'Status', '处理流程', '原库存', '最终库存', '原因'];
     const lines = rows.map((result) => [
+      result.skuId,result.presale,JSON.stringify(result.mabangEvidence),JSON.stringify(result.alternatives),JSON.stringify(result.nameSuggestions),JSON.stringify(result.componentChecks),JSON.stringify(['mabang','store','presale','combo'].map(k=>({type:k,name:session[k]?.name,updatedAt:session[k]?.updatedAt}))),
       result.row,
       result.tags.join('|'),
       result.originalSku,
@@ -796,7 +849,7 @@
     ].map(quoteCsv).join(','));
     const blob = new Blob([`\ufeff${headers.map(quoteCsv).join(',')}\r\n${lines.join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
     const storeName = state?.stores?.find((store) => store.id === selectedStoreId())?.name || '店铺';
-    downloadBlob(blob, `${storeName}_V15库存人工处理名单_${new Date().toISOString().slice(0, 10)}.csv`);
+    downloadBlob(blob, `${storeName}_V17.3库存人工处理名单_${new Date().toISOString().slice(0, 10)}.csv`);
   }
 
   async function prepareInventoryStyles(workbook) {
@@ -907,8 +960,10 @@
     if (style !== null) cell.setAttribute('s', String(style));
   }
 
-  async function buildInventoryWorkbook() {
-    const warehouses = mappedWarehouses();
+  async function buildInventoryWorkbook(options={}) {
+    if(!options.reviewOnly&&!session.audit?.ok)throw Error('存在未解决的多仓库存异常，正式导出已阻止；可下载预览供核对');
+    if(session.context!==contextKey()||session.restoring)throw Error('国家或店铺已变化，请重新识别');
+    const sourceContext=session.context,warehouses = stockWarehouses();
     const workbook = await openWorkbook(session.store.buffer.slice(0));
     await prepareInventoryStyles(workbook);
     const definition = workbook.sheets.find((item) => item.path === session.store.definition.path);
@@ -918,12 +973,15 @@
       setInventoryTextCell(workbook, sheet, result.row, Number(config.storeSku), result.finalSku);
       if (config.storeStatus) setInventoryTextCell(workbook, sheet, result.row, Number(config.storeStatus), result.status);
       for (const warehouse of warehouses) {
-        setInventoryNumberCell(workbook, sheet, result.row, Number(warehouse.storeColumn), result.finalStocks[warehouse.id]);
+        const value=result.finalStocks[warehouse.id];
+        if(value!=null&&clean(value)!==''&&engine.stockNumber(value)==null&&!result.changed)continue;
+        setInventoryNumberCell(workbook, sheet, result.row, Number(warehouse.storeColumn), value);
       }
     }
     workbook.zip.file(definition.path, serializeXml(sheet.doc));
     flushInventoryStyles(workbook);
     const buffer = await workbook.zip.generateAsync({ type: 'arraybuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+    if(sourceContext!==contextKey()||session.context!==sourceContext)throw Error('生成期间国家或店铺发生变化，导出已停止');
     await verifyInventoryWorkbook(buffer, warehouses);
     return new Blob([buffer], { type: MIME_XLSX });
   }
@@ -948,6 +1006,7 @@
         if (expected === null || expected === undefined || expected === '') {
           if (actual !== null && clean(actual) !== '') failures.push(`第${result.row}行 ${warehouse.name} 应为空`);
         } else if (engine.number(actual) !== engine.number(expected)) failures.push(`第${result.row}行 ${warehouse.name} 库存`);
+        if(expected!=null&&clean(expected)!==''&&engine.stockNumber(expected)==null&&!result.changed)continue;
         const stockCell = rowNode && inv15FindCell(rowNode, Number(warehouse.storeColumn));
         if (expected !== null && expected !== undefined && expected !== '' && stockCell?.hasAttribute('t')) failures.push(`第${result.row}行 ${warehouse.name} 数字格式`);
       }
@@ -966,7 +1025,7 @@
     try {
       const blob = await buildInventoryWorkbook();
       const storeName = state?.stores?.find((store) => store.id === selectedStoreId())?.name || '店铺';
-      const filename = `${storeName}_V15库存更新_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const filename = `${storeName}_V17.3库存更新_${new Date().toISOString().slice(0, 10)}.xlsx`;
       downloadBlob(blob, filename);
       toast(`已生成 ${filename}；原模板结构保留，成品二次识别通过`, 'ok');
     } catch (error) {
@@ -1018,35 +1077,43 @@
     page.innerHTML = `
       <section class="inv15-hero">
         <div class="inv15-hero-copy">
-          <div class="eyebrow">Inventory knowledge workspace · V15</div>
-          <h2>三表库存知识库</h2>
-          <p>店铺库存、马帮库存和组合拆分表独立保存、独立更新。规则引擎按原仓、转仓、同款换 SKU 的顺序处理普通商品，并对组合组件、多仓异常和 Inactive 商品进行安全拦截。</p>
+          <div class="eyebrow">Inventory knowledge workspace · V17.3</div>
+          <h2>四表库存识别</h2>
+          <p>马帮库存、店铺库存、店铺预售和组合明细独立保存。按 SKU ID 关联预售；Yes 保持原样，No 且库存≤10查同款，有货只留单仓9999，组合必须同仓满足数量。</p>
           <div class="inv15-hero-badges"><span class="chip good">本机 SQLite</span><span class="chip blue">原格式 Excel</span><span class="chip warn">二次成品复核</span></div>
         </div>
-        <div class="inv15-hero-state"><span>Knowledge base</span><b id="inv15KnowledgeReady">0 / 3 已就绪</b><small>关闭软件后仍保留</small></div>
+        <div class="inv15-hero-state"><span>Knowledge base</span><b id="inv15KnowledgeReady">0 / 4 已就绪</b><small>关闭软件后仍保留</small></div>
       </section>
 
       <section class="inv15-sources">
         <article class="inv15-source-card store">
-          <div class="inv15-source-head"><span>01</span><div><h3>店铺库存表</h3><p id="inv15StoreScope">当前店铺独立保存</p></div></div>
-          <label class="inv15-drop"><input id="inv15StoreFile" data-clear-installed="1" type="file" accept=".xlsx,.xlsm"><b>上传或更新表 1</b><span>保留为最终导出的原始模板</span></label>
-          <button class="inv15-clear" type="button" data-inv15-clear="store">清除已保存表 1</button>
+          <div class="inv15-source-head"><span>02</span><div><h3>店铺库存表</h3><p id="inv15StoreScope">当前店铺独立保存</p></div></div>
+          <label class="inv15-drop"><input id="inv15StoreFile" data-clear-installed="1" type="file" accept=".xlsx,.xlsm"><b>上传或更新表 2</b><span>保留为最终导出的原始模板</span></label>
+          <button class="inv15-clear" type="button" data-inv15-clear="store">清除已保存表 2</button>
           <div id="inv15StoreStatus"></div>
           <details class="inv15-map"><summary>店铺基础列设置</summary><div class="inv15-map-grid" id="inv15StoreBaseMap"></div></details>
         </article>
 
         <article class="inv15-source-card mabang">
-          <div class="inv15-source-head"><span>02</span><div><h3>马帮库存表</h3><p>当前国家系统共享保存</p></div></div>
-          <label class="inv15-drop"><input id="inv15MabangFile" data-clear-installed="1" type="file" accept=".xlsx,.xlsm"><b>上传或更新表 2</b><span>读取普通 SKU、仓库和可用库存</span></label>
-          <button class="inv15-clear" type="button" data-inv15-clear="mabang">清除已保存表 2</button>
+          <div class="inv15-source-head"><span>01</span><div><h3>马帮库存表</h3><p>当前国家系统共享保存</p></div></div>
+          <label class="inv15-drop"><input id="inv15MabangFile" data-clear-installed="1" type="file" accept=".xlsx,.xlsm"><b>上传或更新表 1</b><span>读取普通 SKU、仓库和可用库存</span></label>
+          <button class="inv15-clear" type="button" data-inv15-clear="mabang">清除已保存表 1</button>
           <div id="inv15MabangStatus"></div>
           <details class="inv15-map"><summary>马帮基础列设置</summary><div class="inv15-map-grid" id="inv15MabangBaseMap"></div></details>
         </article>
 
+        <article class="inv15-source-card presale">
+          <div class="inv15-source-head"><span>03</span><div><h3>店铺预售表</h3><p>按店铺独立保存，以 SKU ID 关联</p></div></div>
+          <label class="inv15-drop"><input id="inv15PresaleFile" data-clear-installed="1" type="file" accept=".xlsx,.xlsm"><b>上传或更新表 3</b><span>读取预售 Enable 的 Yes / No</span></label>
+          <button class="inv15-clear" type="button" data-inv15-clear="presale">清除已保存表 3</button>
+          <div id="inv15PresaleStatus"></div>
+          <details class="inv15-map"><summary>预售关联列设置</summary><div class="inv15-map-grid" id="inv15PresaleBaseMap"></div></details>
+        </article>
+
         <article class="inv15-source-card combo">
-          <div class="inv15-source-head"><span>03</span><div><h3>组合拆分表</h3><p>当前国家系统共享保存</p></div></div>
-          <label class="inv15-drop"><input id="inv15ComboFile" data-clear-installed="1" type="file" accept=".xlsx,.xlsm"><b>上传或更新表 3</b><span>自动读取组合及多个普通 SKU 组件</span></label>
-          <button class="inv15-clear" type="button" data-inv15-clear="combo">清除已保存表 3</button>
+          <div class="inv15-source-head"><span>04</span><div><h3>组合拆分表</h3><p>当前国家系统共享保存</p></div></div>
+          <label class="inv15-drop"><input id="inv15ComboFile" data-clear-installed="1" type="file" accept=".xlsx,.xlsm"><b>上传或更新表 4</b><span>自动读取组合及多个普通 SKU 组件</span></label>
+          <button class="inv15-clear" type="button" data-inv15-clear="combo">清除已保存表 4</button>
           <div id="inv15ComboStatus"></div>
           <div class="inv15-combo-summary" id="inv15ComboSummary"></div>
         </article>
@@ -1064,17 +1131,17 @@
       <section class="inv15-command">
         <div class="inv15-command-inputs">
           <label>分析店铺<select id="inv15StoreSelect"></select></label>
-          <label>库存阈值<input id="inv15Threshold" type="number" min="0" value="30"></label>
-          <label>超过阈值写入<input id="inv15Overflow" type="number" min="1" value="9999"></label>
+          <label>不足阈值（固定）<input id="inv15Threshold" type="number" value="10" readonly></label>
+          <label>超过阈值写入<input id="inv15Overflow" type="number" value="9999" readonly></label>
         </div>
-        <button class="inv15-run" id="inv15Analyze" type="button">执行 V15 库存识别</button>
-        <div class="inv15-command-note"><b>严格顺序</b><span>原仓有货 → 同 SKU 转仓 → 后四位同款换 SKU → 保持原样并进入人工名单</span></div>
+        <button class="inv15-run" id="inv15Analyze" type="button">执行库存识别</button>
+        <div class="inv15-command-note"><b>严格顺序</b><span>关联预售 → 同 SKU 最大库存 → 未预售且≤10找同款 → 无更优库存则清空并列人工名单</span></div>
       </section>
 
       <section class="inv15-panel inv15-results-panel">
         <div class="inv15-panel-head results">
           <div><div class="eyebrow">Final inventory review</div><h3>最终库存结果与人工处理名单</h3><p>“预售 / 异常 / 未上架”标签只进入人工名单，不会擅自添加到原 Excel 列中。</p></div>
-          <div class="inv15-panel-actions"><button class="btn light" id="inv15ExportManual" disabled>导出人工处理名单</button><button class="btn primary" id="inv15ExportWorkbook" disabled>导出最终店铺库存表</button></div>
+          <div class="inv15-panel-actions"><button class="btn light" id="inv15ExportReview" hidden>导出预览供核对</button><button class="btn light" id="inv15ExportManual" disabled>导出人工处理名单</button><button class="btn primary" id="inv15ExportWorkbook" disabled>导出最终店铺库存表</button></div>
         </div>
         <div id="inv15Audit"></div>
         <div class="inv15-metrics" id="inv15Metrics"></div>
@@ -1094,35 +1161,38 @@
           </select>
           <span id="inv15ResultCount">尚未分析</span>
         </div>
-        <div id="inv15ResultList" class="inv15-result-list"><div class="inv15-empty">三个知识库就绪后，点击“执行 V15 库存识别”。</div></div>
+        <div id="inv15ResultList" class="inv15-result-list"><div class="inv15-empty">四张表就绪后，点击“执行库存识别”。</div></div>
         <div id="inv15More" class="inv15-more"></div>
       </section>`;
 
+    const sourceGrid=q('.inv15-sources',page);for(const kind of ['mabang','store','presale','combo'])sourceGrid.appendChild(q('.inv15-source-card.'+kind,page));
     populateStores();
     q('#inv15StoreScope').textContent = sourceScope('store');
     q('#inv15Threshold').value = String(config.threshold);
     q('#inv15Overflow').value = String(config.overflowValue);
     q('#inv15StoreFile').addEventListener('change', (event) => saveSource('store', event.target.files?.[0]));
     q('#inv15MabangFile').addEventListener('change', (event) => saveSource('mabang', event.target.files?.[0]));
+    q('#inv15PresaleFile').addEventListener('change',event=>saveSource('presale',event.target.files?.[0]));
     q('#inv15ComboFile').addEventListener('change', (event) => saveSource('combo', event.target.files?.[0]));
     qa('[data-inv15-clear]').forEach((button) => button.addEventListener('click', () => askClearSource(button.dataset.inv15Clear)));
     q('#inv15AddWarehouse').addEventListener('click', addWarehouse);
     q('#inv15Analyze').addEventListener('click', analyzeInventory);
+    q('#inv15ExportReview').addEventListener('click',async()=>{try{const blob=await buildInventoryWorkbook({reviewOnly:true});downloadBlob(blob,`${state.stores.find(x=>x.id===selectedStoreId())?.name||'店铺'}_库存预览_含待确认行_V17.3.xlsx`)}catch(error){toast(error.message,'err')}});
     q('#inv15ExportManual').addEventListener('click', exportManualList);
     q('#inv15ExportWorkbook').addEventListener('click', exportInventoryWorkbook);
     q('#inv15StoreSelect').addEventListener('change', async (event) => {
-      session.storeId = event.target.value;
+      session.storeId = event.target.value;config=loadConfig();
       window.selectedStoreId = session.storeId;
       q('#inv15StoreScope').textContent = sourceScope('store');
       await restoreAllSources({ storeOnly: true });
     });
     q('#inv15Threshold').addEventListener('change', (event) => { config.threshold = Math.max(0, engine.number(event.target.value)); saveConfig(); clearAnalysis(); });
     q('#inv15Overflow').addEventListener('change', (event) => { config.overflowValue = Math.max(1, engine.number(event.target.value)); saveConfig(); clearAnalysis(); });
-    q('#inv15Filter').addEventListener('change', (event) => { session.filter = event.target.value; session.visibleLimit = 200; renderResults(); });
+    q('#inv15Filter').addEventListener('change', (event) => { session.filter = event.target.value; session.visibleLimit = 100; renderResults(); });
     let searchTimer;
     q('#inv15Search').addEventListener('input', (event) => {
       clearTimeout(searchTimer);
-      searchTimer = setTimeout(() => { session.query = clean(event.target.value); session.visibleLimit = 200; renderResults(); }, 140);
+      searchTimer = setTimeout(() => { session.query = clean(event.target.value); session.visibleLimit = 100; renderResults(); }, 140);
     });
     page.addEventListener('change', (event) => {
       const target = event.target;
@@ -1136,13 +1206,13 @@
       if (metric) {
         session.filter = metric.dataset.inv15Filter;
         q('#inv15Filter').value = session.filter;
-        session.visibleLimit = 200;
+        session.visibleLimit = 100;session.page=1;
         renderResults();
       }
     });
 
     qa('#countrySwitch [data-country]').forEach((button) => button.addEventListener('click', () => setTimeout(() => {
-      populateStores();
+      populateStores();config=loadConfig();
       q('#inv15StoreScope').textContent = sourceScope('store');
       restoreAllSources();
     }, 100)));
@@ -1160,7 +1230,7 @@
   function refreshStores() {
     const previous = selectedStoreId();
     populateStores();
-    if (selectedStoreId() !== previous) restoreAllSources({ storeOnly: true });
+    if (selectedStoreId() !== previous) { config=loadConfig();restoreAllSources({ storeOnly: true }); }
   }
 
   try {
@@ -1170,12 +1240,15 @@
       version: engine.VERSION,
       getConfig: () => JSON.parse(JSON.stringify(config)),
       getSession: () => session,
+      saveSourceForTest: saveSource,
+      renderForTest: renderResults,
+      exportManualForTest: exportManualList,
       getStores: () => (state?.stores || []).map((store) => ({ id: store.id, name: store.name, active: store.active !== false })),
       refreshStores,
       restoreAllSources,
       clearSource,
       analyze: analyzeInventory,
-      buildWorkbookForTest: buildInventoryWorkbook,
+      buildWorkbookForTest: () => buildInventoryWorkbook({reviewOnly:true}),
       verifyWorkbookForTest: verifyInventoryWorkbook,
       engine,
     };
