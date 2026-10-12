@@ -9,7 +9,7 @@ r=run([store('T5HH1850591')],[stock('T5HH1850591',10,0),stock('T3HH2200591',10,0
 r=run([store('T5HH1850591',{presale:'yes'})],[stock('T5HH1850591',0,0),stock('T3HH2200591',42,0)]).results[0];assert.equal(r.changed,false);assert.deepEqual(r.finalStocks,{a:50,b:0});
 r=run([store('T5HH1850591',{presale:'unknown'})],[stock('T5HH1850591',42,0)]).results[0];assert.equal(r.changed,false);assert(r.manual);
 r=run([store('T5HH1850591',{stocks:{a:40,b:60}})],[stock('T5HH1850591',8,35)]);assert(r.audit.ok);assert.equal(r.results[0].finalStocks.a,null);assert.equal(r.results[0].finalStocks.b,9999);
-r=run([store('T5HH1850591',{presale:'yes',stocks:{a:40,b:60}})],[stock('T5HH1850591',8,35)]);assert(!r.audit.ok);assert(r.results[0].tags.includes('异常'));assert(!r.results[0].changed);
+r=run([store('T5HH1850591',{presale:'yes',stocks:{a:40,b:60}})],[stock('T5HH1850591',8,35)]);assert(r.audit.ok);assert(r.results[0].confirmedMultiwarehouseException);assert.equal(r.results[0].finalStocks.b,60);assert.equal(r.results[0].finalStocks.a,null);
 const combo=new Map([['T3HH0623544X1',{name:'帐篷组合',components:[{sku:'T5HH1850591',quantity:3},{sku:'T4HH1234567',quantity:2}]}]]);
 r=run([store('T3HH0623544X1S1')],[stock('T5HH1850591',2,1),stock('T4HH1234567',2,0)],combo).results[0];assert(r.tags.includes('预售'));assert(!r.changed);
 r=run([store('T3HH0623544X1')],[stock('T5HH1850591',3,0),stock('T4HH1234567',0,2)],combo).results[0];assert(r.tags.includes('预售'),'both components must be in same physical warehouse');
@@ -24,4 +24,5 @@ assert.equal(e.parseSku('T3HH0623544X1S12').canonical,'T3HH0623544X1');assert.eq
 assert(e.nameSimilarity('户外帐篷2米3米米白色','户外帐篷2米3米黑色')<.95);
 // Same mapping pointing to different physical warehouses cannot make a healthy bundle.
 const physical=[{sku:'T5HH1850591',locations:[{key:'CFS-1',warehouseId:'a',stock:3,name:'CFS-1'}]},{sku:'T4HH1234567',locations:[{key:'CFS-2',warehouseId:'a',stock:2,name:'CFS-2'}]}];r=run([store('T3HH0623544X1')],physical,combo).results[0];assert(r.tags.includes('预售'));
+r=run([store('T5HH1850591',{stocks:{a:40,b:60}})],[]);assert(r.audit.ok);assert(r.results[0].confirmedMultiwarehouseException);assert.equal(r.results[0].finalStocks.b,60);assert.equal(r.results[0].finalStocks.a,null);
 console.log('INVENTORY_V173_UNIT_OK');

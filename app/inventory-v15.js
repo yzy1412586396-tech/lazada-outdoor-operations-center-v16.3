@@ -646,6 +646,7 @@
   function clearAnalysis() {
     session.results = [];
     session.audit = null;session.context=null;
+    if(q('#inv15ExportReview'))q('#inv15ExportReview').hidden=true;
     if(q('#inv15ExportWorkbook'))q('#inv15ExportWorkbook').disabled=true;
     if(q('#inv15ExportManual'))q('#inv15ExportManual').disabled=true;
     session.visibleLimit = 100;session.page=1;
@@ -705,7 +706,7 @@
     manual_multi_store_warehouse: '店铺多仓异常',
     manual_no_stock: '库存不足 · 已清空',
     manual_invalid_sku: 'SKU 格式异常',
-    presale_unchanged:'已开预售 · 保持原样',manual_presale_unknown:'预售状态待核对',manual_mabang_unknown:'马帮库存待核对',manual_unmapped_stock:'仓库映射待补全',manual_sku_collision:'替换 SKU 重复',
+    manual_multi_consolidated:'原多仓例外 · 保留最大仓',presale_unchanged:'已开预售 · 保持原样',manual_presale_unknown:'预售状态待核对',manual_mabang_unknown:'马帮库存待核对',manual_unmapped_stock:'仓库映射待补全',manual_sku_collision:'替换 SKU 重复',
     unchanged: '保持原样',
   };
 
@@ -1079,7 +1080,7 @@
         <div class="inv15-hero-copy">
           <div class="eyebrow">Inventory knowledge workspace · V17.3</div>
           <h2>四表库存识别</h2>
-          <p>马帮库存、店铺库存、店铺预售和组合明细独立保存。按 SKU ID 关联预售；Yes 保持原样，No 且库存≤10查同款，有货只留单仓9999，组合必须同仓满足数量。</p>
+          <p>马帮库存、店铺库存、店铺预售和组合明细独立保存。按 SKU ID 关联预售；Yes 单仓保持原样，原多仓按确认例外整理；No 且库存≤10查同款，有货只留单仓9999，组合必须同仓满足数量。</p>
           <div class="inv15-hero-badges"><span class="chip good">本机 SQLite</span><span class="chip blue">原格式 Excel</span><span class="chip warn">二次成品复核</span></div>
         </div>
         <div class="inv15-hero-state"><span>Knowledge base</span><b id="inv15KnowledgeReady">0 / 4 已就绪</b><small>关闭软件后仍保留</small></div>

@@ -31,3 +31,5 @@
 .inv15-name-suggestions{padding:9px;margin-top:9px;border:1px solid var(--line);border-radius:10px;background:var(--accentSoft)}
 .inv15-more{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:11px}
 .inv15-sku-change{flex-wrap:wrap}
+
+.inv15-panel-actions [hidden]{display:none!important}
