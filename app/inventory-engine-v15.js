@@ -5,8 +5,8 @@
   if (root) root.InventoryEngineV15 = Object.freeze(api);
 })(typeof window !== 'undefined' ? window : globalThis, () => {
   'use strict';
-  const VERSION = '17.5';
-  const TAGS = Object.freeze({PRESALE:'预售',ANOMALY:'异常',UNLISTED:'未上架',OPENED:'已开预售',ACTIVITY:'活动中'});
+  const VERSION = '17.6';
+  const TAGS = Object.freeze({PRESALE:'预售',ANOMALY:'异常',UNLISTED:'未上架',OPENED:'已开预售',ACTIVITY:'活动中',SPECIAL:'特殊提示'});
   const clean = value => String(value ?? '').trim();
   const normalizeRawSku = value => clean(value).replace(/\s+/g,'').toUpperCase();
   function parseSku(value) {
@@ -66,13 +66,13 @@
     for (const r of results) occupied.set(normalizeRawSku(r.finalSku), (occupied.get(normalizeRawSku(r.finalSku)) || 0) + 1);
     for (const r of results) {
       const positive = positiveWarehouseIds(r.finalStocks, warehouses);
-      if (r.activityProtected) {
-        if (r.changed) failures.push({row:r.row, reason:'active 活动保护行被修改'});
+      if (r.activityProtected || r.preserveRow) {
+        if (r.changed) failures.push({row:r.row, reason:'保留原样的行被修改'});
         continue; // User explicitly prioritizes active protection over warehouse cleanup.
       }
       if (positive.length > 1) failures.push({row:r.row, reason:'非活动行最终仍有多仓库存'});
       if (r.forbiddenWarehouseIds.some(id => number(r.finalStocks[id]) !== 0 || r.finalStocks[id] == null)) failures.push({row:r.row, reason:'非指定仓未写数字0'});
-      if (r.flow.startsWith('flow') && (r.actualStock <= 10 || number(r.finalStocks[r.selectedWarehouseId]) !== 9999)) failures.push({row:r.row, reason:'有货库存不符合>10写9999'});
+      if ((r.flow.startsWith('flow')||r.flow==='related_sku_replacement') && (r.actualStock <= 10 || number(r.finalStocks[r.selectedWarehouseId]) !== 9999)) failures.push({row:r.row, reason:'有货库存不符合>10写9999'});
       if (r.finalSku !== r.originalSku && occupied.get(normalizeRawSku(r.finalSku)) !== 1) failures.push({row:r.row, reason:'替换SKU仍重复'});
       if (r.flow === 'flow3_same_product_replacement' && !r.allocatedSuffix && parseSku(r.finalSku).suffix !== parseSku(r.originalSku).suffix) failures.push({row:r.row, reason:'非冲突替换丢失原后缀'});
     }
@@ -99,6 +99,23 @@
       }
       comboPolicyCache.set(key,result);return result;
     }
+    // Explicit related-product rules are only a fallback after same-product
+    // candidates. A replacement must have >10 capacity in one mapped warehouse.
+    function linkedReplacement(info){
+      for(const rule of options.relatedSkus||[]){
+        if(!rule.from||!rule.to||parseSku(rule.from).canonical!==info.canonical)continue;
+        const target=parseSku(rule.to);if(target.canonical===info.canonical)continue;
+        const ordinary=index.bySku.get(target.canonical);
+        if(target.kind==='ordinary'&&ordinary&&!ordinary.conflict&&ordinary.best?.stock>10)return ordinary;
+        if(target.kind==='combo'){
+          const policy=comboPolicy(target.canonical);if(!policy.known||policy.low)continue;
+          const keys=[...new Set(policy.checks.flatMap(c=>c.warehouses.map(w=>w.key)))];
+          const available=keys.map(key=>{const loc=policy.checks[0].warehouses.find(w=>w.key===key);const stock=Math.min(...policy.checks.map(c=>Math.floor((c.warehouses.find(w=>w.key===key)?.stock??0)/c.quantity)));return loc&&stock>10?{...loc,stock}:null}).filter(Boolean).sort((a,b)=>b.stock-a.stock||a.key.localeCompare(b.key));
+          if(available.length)return{canonical:target.canonical,exactSku:target.canonical,name:policy.name,best:available[0]};
+        }
+      }
+      return null;
+    }
     for (const source of options.storeRows||[]) {
       const info=parseSku(source.sku), originalStocks=cloneStocks(source.stocks,stockWarehouses), exact=index.bySku.get(info.canonical);
       const r={row:source.row,skuId:clean(source.skuId),title:clean(source.title),status:clean(source.status),originalSku:clean(source.sku),canonicalSku:info.canonical,finalSku:clean(source.sku),kind:info.kind,originalStocks,finalStocks:{...originalStocks},tags:[],reasons:[],flow:'unchanged',selectedWarehouseId:'',actualStock:exact?.best?.stock??0,mabangName:exact?.name||'',componentChecks:[],nameSuggestions:[],alternatives:[],changed:false,manual:false,presale:source.presale||'unknown',presaleReason:source.presaleReason||'',mabangEvidence:exact?[...exact.locations.values()]:[],activityProtected:/^active$/i.test(clean(source.status)),forbiddenWarehouseIds:stockWarehouses.filter(w=>!mappedIds.has(w.id)).map(w=>w.id)};
@@ -112,16 +129,23 @@
       const mappedZero=warehouses.every(w=>number(originalStocks[w.id])===0);
       const allZero=stockWarehouses.every(w=>number(originalStocks[w.id])===0);
       // An already cleared No row is a completed operation, not another shortage report.
-      if (info.kind!=='invalid'&&r.presale==='no'&&mappedZero&&(low||(info.kind==='ordinary'&&!exact))&&(!r.activityProtected||allZero)) mark(null,'already_processed','库存不足、未预售，指定仓库存均为0，已处理过，无需操作');
+      const excluded=(options.excludedSkus||[]).some(rule=>{const sku=normalizeRawSku(rule.sku);return sku&&(rule.mode==='contains'?info.raw.includes(sku):info.raw===sku)});
+      if(excluded){r.preserveRow=true;mark(null,'special_excluded','已设置跳过识别，保持原样');}
+      else if(info.kind==='invalid'){r.preserveRow=true;mark(TAGS.SPECIAL,'special_invalid_sku','SKU格式特殊，保持原样');}
+      else if (info.kind!=='invalid'&&r.presale==='no'&&mappedZero&&(low||(info.kind==='ordinary'&&!exact))&&(!r.activityProtected||allZero)) mark(null,'already_processed','库存不足、未预售，指定仓库存均为0，已处理过，无需操作');
       else if (r.activityProtected) {
-        mark((low||unknownStock||r.forbiddenWarehouseIds.some(id=>number(originalStocks[id])>0)||positiveWarehouseIds(originalStocks,stockWarehouses).length>1)?TAGS.ACTIVITY:null,'activity_protected','Status=active，按活动保护规则保留原SKU及全部库存');
-        if(low)r.reasons.push('该商品活动中且库存不足，暂不能清除库存或替换SKU');
-        else if(unknownStock)r.reasons.push('该商品活动中，库存或组件数据未匹配/冲突，情况待核对，暂不修改');
-        if(r.forbiddenWarehouseIds.some(id=>number(originalStocks[id])>0))r.reasons.push('非指定仓仍有库存，但active保护优先，活动结束后再清零');
+        // V17.6 supersedes the former unconditional active freeze. Only a
+        // confirmed shortage, No presale and no stocked replacement needs review.
+        if(r.presale==='yes')mark(null,'activity_presale_unchanged','活动中已开预售，保持原样');
+        else if(low&&r.presale==='no'){
+          const alt=(info.kind==='ordinary'?bestAlternative(info,index,exact.best.stock):null)||linkedReplacement(info);
+          if(alt){r.activityProtected=false;r.finalSku=alt.exactSku+info.suffix;apply(alt,info.kind==='ordinary'&&alt.canonical.slice(-4)===info.key4?'flow3_same_product_replacement':'related_sku_replacement','活动中库存不足，替换为有货SKU '+alt.exactSku);}
+          else mark(TAGS.ACTIVITY,'activity_manual_stockout','活动中缺货、未开预售且无可用替换SKU，保持原样，需人工处理');
+        }else mark(null,'activity_protected','活动商品保持原样');
       }
       else if (r.presale==='yes') mark(TAGS.OPENED,'presale_unchanged','已开预售，保留SKU及指定仓原库存；非指定仓按规则清零');
       else if (r.presale!=='no') mark(TAGS.ANOMALY,'manual_presale_unknown',source.presaleReason||'预售关联未知，指定仓保持原样');
-      else if (info.kind==='invalid') mark(TAGS.ANOMALY,'manual_invalid_sku','SKU格式无效，指定仓保持原样');
+      else if (info.kind==='invalid') mark(TAGS.SPECIAL,'special_invalid_sku','SKU格式特殊，保持原样');
       else if (warehouses.some(w=>originalStocks[w.id]!=null&&clean(originalStocks[w.id])!==''&&stockNumber(originalStocks[w.id])==null)) mark(TAGS.ANOMALY,'manual_invalid_stock','指定仓原库存含无效数字，请核对');
       else if (info.kind==='combo') {
         r.componentChecks=[];
@@ -135,15 +159,15 @@
           const feasible=keys.filter(key=>r.componentChecks.every(c=>c.warehouses.some(w=>w.key===key&&w.stock>=c.quantity))).sort();
           if(unknown)mark(TAGS.ANOMALY,'manual_combo_source','组件库存数据缺失或冲突，不能确定缺货，指定仓保持原样');
           else if(feasible.length){r.commonWarehouse=feasible[0];for(const c of r.componentChecks){c.available=c.warehouses.find(w=>w.key===r.commonWarehouse).stock;c.ok=true}mark(null,'combo_healthy','同一实际仓库满足全部组件数量，保留组合SKU及指定仓库存')}
-          else {for(const c of r.componentChecks)c.ok=c.available>=c.quantity;if(mappedZero&&allZero)mark(null,'already_processed','组合未预售、同仓组件不足且库存已为0，已处理过，无需操作');else clear('组合没有单仓同时满足全部组件数量，未预售，库存清零完成，无需缺货报备')}
+          else {for(const c of r.componentChecks)c.ok=c.available>=c.quantity;const linked=linkedReplacement(info);if(linked){r.finalSku=linked.exactSku+info.suffix;apply(linked,'related_sku_replacement','组合缺货，按关联SKU替换为 '+linked.exactSku)}else if(mappedZero&&allZero)mark(null,'already_processed','组合未预售、同仓组件不足且库存已为0，已处理过，无需操作');else clear('组合没有单仓同时满足全部组件数量，未预售，库存清零完成，无需缺货报备')}
         }
       }
       else if(!exact||exact.conflict||!exact.best)mark(TAGS.ANOMALY,'manual_mabang_unknown','马帮数据缺失或冲突，不能确定实际缺货，指定仓保持原样');
       else if(exact.best.stock>10)apply(exact,number(originalStocks[exact.best.warehouseId])>0?'flow1_original_warehouse':'flow2_same_sku_other_warehouse',`最大单仓可用量 ${exact.best.name} ${exact.best.stock}件，写9999，其余仓写0`);
       else {
         r.alternatives=(index.byKey4.get(info.key4)||[]).filter(rec=>rec.canonical!==info.canonical).map(rec=>({sku:rec.canonical,stock:rec.best?.stock??null,warehouse:rec.best?.name||'',conflict:rec.conflict}));
-        const alt=bestAlternative(info,index,exact.best.stock);
-        if(alt){r.finalSku=alt.exactSku+info.suffix;apply(alt,'flow3_same_product_replacement',`库存≤10且未预售，同款${alt.exactSku}有${alt.best.stock}件，保留原后缀${info.suffix||'（无）'}`)}
+        const same=bestAlternative(info,index,exact.best.stock),alt=same||linkedReplacement(info);
+        if(alt){r.finalSku=alt.exactSku+info.suffix;apply(alt,same?'flow3_same_product_replacement':'related_sku_replacement',`库存≤10且未预售，${same?'同款':'关联SKU'}${alt.exactSku}有${alt.best.stock}件，保留原后缀${info.suffix||'（无）'}`)}
         else {
           clear(`最大可用量${exact.best.stock}≤10且未预售，没有有效更优同款，库存清零完成，无需缺货报备`);
           const originalMappedIds=positiveWarehouseIds(originalStocks,warehouses);if(!originalMappedIds.length)originalMappedIds.push(exact.best.warehouseId);
@@ -152,7 +176,7 @@
           // Candidates remain visible in this completed row; clearing alone never enters the manual list.
         }
       }
-      if(!r.activityProtected){
+      if(!r.activityProtected&&!r.preserveRow){
         for(const id of r.forbiddenWarehouseIds)r.finalStocks[id]=0;
         const positive=positiveWarehouseIds(r.finalStocks,warehouses);
         if(positive.length>1){const best=chooseBestWarehouse(r.finalStocks,warehouses);for(const id of positive)if(id!==best.warehouse.id)r.finalStocks[id]=0;r.reasons.push('指定仓多仓库存已整理，只保留原数量最多的指定仓')}
@@ -161,7 +185,7 @@
         const a=r.originalStocks[w.id],b=r.finalStocks[w.id];
         return (a==null||a==='')!==(b==null||b==='')||stockNumber(a)!==stockNumber(b);
       });
-      r.manual=r.tags.some(t=>t!==TAGS.OPENED);results.push(r);
+      r.manual=r.tags.some(t=>t===TAGS.ANOMALY||t===TAGS.ACTIVITY);results.push(r);
     }
     // Reserve all original names and earlier allocations. Never stack S1S2 or rename a protected row.
     const occupied=new Set(results.map(r=>normalizeRawSku(r.originalSku)));

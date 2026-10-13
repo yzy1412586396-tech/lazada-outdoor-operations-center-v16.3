@@ -33,7 +33,7 @@
 
   function defaultConfig() {
     return {
-      version: 4,
+      version: 5,excludedSkus:[],relatedSkus:[],
       threshold: 10,
       overflowValue: 9999,
       storeSku: '', storeSkuHeader: '', storeSkuId: '', storeSkuIdHeader: '',
@@ -48,9 +48,17 @@
 
   function loadConfig() {
     try {
-      const saved = JSON.parse(localStorage.getItem(configKey()) || localStorage.getItem(CONFIG_KEY) || localStorage.getItem(LEGACY_CONFIG_KEY) || 'null');
-      if (!saved || typeof saved !== 'object') return defaultConfig();
-      const merged = { ...defaultConfig(), ...saved, version: 4 };
+      let saved = JSON.parse(localStorage.getItem(configKey()) || localStorage.getItem(CONFIG_KEY) || localStorage.getItem(LEGACY_CONFIG_KEY) || 'null')||defaultConfig();
+      let common=JSON.parse(localStorage.getItem(sharedConfigKey())||'null');
+      // One-time migration keeps the configured country's warehouse template,
+      // rather than giving every new store a fresh CFS/高易 default.
+      if(!common){
+        const candidates=[saved];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key.startsWith(CONFIG_KEY+':'+country()+':')){try{candidates.push(JSON.parse(localStorage.getItem(key)))}catch{}}}
+        const rank=x=>(x?.warehouses||[]).reduce((n,w)=>n+(w.storeHeader?4:0)+(w.mabangStockHeader?2:0)+(!['CFS','高易',''].includes(w.mabangValue)?1:0),0);
+        const best=candidates.filter(Boolean).sort((a,b)=>rank(b)-rank(a))[0];common=sharedConfig(best||saved);localStorage.setItem(sharedConfigKey(),JSON.stringify(common));
+      }
+      saved={...saved,...common};
+      const merged = { ...defaultConfig(), ...saved, version: 5 };
       merged.threshold = 10;
       merged.overflowValue = 9999;
       merged.warehouses = Array.isArray(saved.warehouses) && saved.warehouses.length
@@ -63,18 +71,21 @@
           mabangStockHeader: Number(saved.version)>=4?clean(warehouse.mabangStockHeader):'',
           mabangValue: clean(warehouse.mabangValue),
         }))
-        : defaultConfig().warehouses;
+        : (Array.isArray(saved.warehouses)?[]:defaultConfig().warehouses);
       return merged;
     } catch {
       return defaultConfig();
     }
   }
 
+  function sharedConfigKey(){return `${CONFIG_KEY}:shared:${country()}`;}
+  function sharedConfig(value){return Object.fromEntries(['warehouses','excludedSkus','relatedSkus','mabangSku','mabangSkuHeader','mabangName','mabangNameHeader','mabangWarehouse','mabangWarehouseHeader'].map(key=>[key,value[key]??(key.endsWith('Skus')?[]:'')]));}
   let config = loadConfig();
 
   let configFlushTimer;
   function saveConfig() {
     localStorage.setItem(configKey(), JSON.stringify(config));
+    localStorage.setItem(sharedConfigKey(),JSON.stringify(sharedConfig(config)));
     clearTimeout(configFlushTimer);configFlushTimer=setTimeout(()=>window.desktopApp?.database?.flush(),450);
   }
 
@@ -540,12 +551,26 @@
         <label>仓库显示名称<input data-inv15-warehouse-name value="${escapeHtml(warehouse.name)}" placeholder="例如：CFS"></label>
         <label>店铺库存列<select data-inv15-store-column>${columnOptions(storeColumns, warehouse.storeColumn)}</select></label>
         <label>马帮库存列<select data-inv15-mabang-stock>${columnOptions(mabangColumns, warehouse.mabangStockColumn)}</select></label>
-        <label>马帮仓库名称关键字<span class="inv15-keyword-editor"><input data-inv15-mabang-value value="${escapeHtml(warehouse.mabangValue)}" placeholder="填写关键字，或从下方选择"><button type="button" class="btn light sm" data-inv15-clear-keyword aria-label="清空 ${escapeHtml(warehouse.name)} 仓库关键字">清空</button></span><select data-inv15-choose-warehouse aria-label="重新选择 ${escapeHtml(warehouse.name)} 马帮仓库"><option value="">选择马帮仓库…</option>${distinctWarehouseValues().map(value=>`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('')}</select></label>
+        <label>马帮仓库<span class="inv15-keyword-editor"><input data-inv15-mabang-value list="inv15WarehouseValues" value="${escapeHtml(warehouse.mabangValue)}" placeholder="选择仓库或填写关键字"><button type="button" class="btn light sm" data-inv15-open-warehouse aria-label="选择 ${escapeHtml(warehouse.name)} 马帮仓库">⌄</button><button type="button" class="btn light sm" data-inv15-clear-keyword aria-label="清空 ${escapeHtml(warehouse.name)} 仓库关键字">×</button></span></label>
         <button class="btn danger sm" type="button" data-inv15-delete-warehouse>删除</button>
       </div>`).join('') : '<div class="inv15-empty">还没有仓库映射，请新增仓库。</div>';
     q('#inv15WarehouseCount').textContent = `${config.warehouses.length} 个仓库`;
   }
 
+  function openWarehousePicker(button){
+    const picker=q('#inv15WarehousePicker'),row=button.closest('[data-warehouse-id]');picker.dataset.warehouseId=row.dataset.warehouseId;
+    picker.innerHTML=distinctWarehouseValues().map(value=>`<button type="button" data-inv15-pick-value="${escapeHtml(value)}">${escapeHtml(value)}</button>`).join('')||'<span>请先导入马帮库存表</span>';
+    const rect=button.getBoundingClientRect();picker.style.left=Math.max(12,rect.right-330)+'px';picker.style.top=Math.min(rect.bottom+4,window.innerHeight-240)+'px';picker.showPopover();
+  }
+  function renderSpecialSkus(){
+    q('#inv15ExcludedList').innerHTML=(config.excludedSkus||[]).map((rule,i)=>`<div class="inv15-special-item"><span>${escapeHtml(rule.sku)}</span><span>${rule.mode==='contains'?'包含':'完全匹配'}</span><button type="button" data-inv15-remove-excluded="${i}" aria-label="删除跳过SKU ${escapeHtml(rule.sku)}">×</button></div>`).join('');
+    q('#inv15RelatedList').innerHTML=(config.relatedSkus||[]).map((rule,i)=>`<div class="inv15-special-item"><span>${escapeHtml(rule.from)} → ${escapeHtml(rule.to)}</span><button type="button" data-inv15-remove-related="${i}" aria-label="删除关联 ${escapeHtml(rule.from)}">×</button></div>`).join('');
+  }
+  function addSpecialRule(kind){
+    if(kind==='excluded'){const sku=engine.normalizeRawSku(q('#inv15ExcludeSku').value),mode=q('#inv15ExcludeMode').value;if(!sku)return;config.excludedSkus=config.excludedSkus||[];if(!config.excludedSkus.some(r=>r.sku===sku&&r.mode===mode))config.excludedSkus.push({sku,mode});q('#inv15ExcludeSku').value='';}
+    else {const from=engine.normalizeRawSku(q('#inv15RelatedFrom').value),to=engine.normalizeRawSku(q('#inv15RelatedTo').value);if(engine.parseSku(from).kind==='invalid'||engine.parseSku(to).kind==='invalid'||engine.parseSku(from).canonical===engine.parseSku(to).canonical)return toast('请填写两个不同的有效SKU','err');config.relatedSkus=config.relatedSkus||[];if(config.relatedSkus.some(r=>engine.parseSku(r.from).canonical===engine.parseSku(from).canonical))return toast('这个SKU已有对应关系，请先删除旧关联','err');config.relatedSkus.push({from,to});q('#inv15RelatedFrom').value=q('#inv15RelatedTo').value='';}
+    saveConfig();clearAnalysis();renderSpecialSkus();
+  }
   function addWarehouse() {
     const id = `warehouse-${Date.now()}`;
     config.warehouses.push({ id, name: `新仓库 ${config.warehouses.length + 1}`, storeColumn: '', storeHeader: '', mabangStockColumn: '', mabangStockHeader: '', mabangValue: '' });
@@ -696,7 +721,7 @@
         comboMap: session.combo.comboMap,
         warehouses,
         threshold: config.threshold,
-        overflowValue: config.overflowValue,
+        overflowValue: config.overflowValue,excludedSkus:config.excludedSkus,relatedSkus:config.relatedSkus,
       });
       session.context=scope;session.results = analysis.results;
       session.audit = analysis.audit;
@@ -713,7 +738,7 @@
   }
 
   const FLOW_LABELS = {
-    activity_protected:'活动保护',already_processed:'已处理 · 跳过',stock_cleared:'库存已清零',
+    activity_presale_unchanged:'活动中已预售',activity_manual_stockout:'活动缺货待处理',special_invalid_sku:'SKU特殊提示',special_excluded:'跳过识别',related_sku_replacement:'关联SKU替换',activity_protected:'保持原样',already_processed:'已处理 · 跳过',stock_cleared:'库存已清零',
     flow1_original_warehouse: '流程一 · 原仓有货',
     flow2_same_sku_other_warehouse: '流程二 · 同 SKU 转仓',
     flow3_same_product_replacement: '流程三 · 同款换 SKU',
@@ -745,6 +770,8 @@
     if (session.filter === 'changed') return result.changed;
     if (session.filter === 'manual') return result.manual;
     if (session.filter === 'presale') return result.presale==='yes';
+    if(session.filter==='special')return result.tags.includes(engine.TAGS.SPECIAL)||result.flow==='special_excluded';
+    if(session.filter==='related')return result.flow==='related_sku_replacement';
     if (session.filter === 'anomaly') return result.tags.includes(engine.TAGS.ANOMALY);
     if (session.filter === 'activity') return result.tags.includes(engine.TAGS.ACTIVITY);
     if (session.filter === 'processed') return ['already_processed','stock_cleared'].includes(result.flow);
@@ -824,6 +851,7 @@
       metricButton('manual', '人工处理', counts.manual, 'danger'),
       metricButton('presale', '已开预售', counts.presale, 'warn'),
       metricButton('anomaly', '异常', counts.anomaly, 'danger'),
+      metricButton('special','特殊提示',session.results.filter(r=>r.tags.includes(engine.TAGS.SPECIAL)||r.flow==='special_excluded').length),
       metricButton('activity', '活动中', session.results.filter(r=>r.tags.includes(engine.TAGS.ACTIVITY)).length, 'blue'),
       metricButton('processed', '已处理/清零',session.results.filter(r=>['already_processed','stock_cleared'].includes(r.flow)).length),
       metricButton('combo', '组合 SKU', counts.combo),
@@ -837,7 +865,7 @@
     q('#inv15Prev').onclick=()=>{session.page--;renderResults()};q('#inv15Next').onclick=()=>{session.page++;renderResults()};
     const audit = session.audit;
     q('#inv15Audit').innerHTML = audit?.ok
-      ? `<div class="inv15-audit good"><b>✓ 最终规则复核通过</b><span>${audit.changedRows} 行自动更新；${audit.unresolvedRows} 行需人工处理（包含已清空库存的缺货行）；导出时还会重新读取成品 Excel 验证格式。</span></div>`
+      ? `<div class="inv15-audit good"><b>✓ 最终规则复核通过</b><span>${audit.changedRows} 行自动更新；${audit.unresolvedRows} 行需人工处理；</span></div>`
       : `<div class="inv15-audit danger"><b>最终规则复核未通过</b><span>${audit?.failures?.map((item) => `第${item.row}行：${item.reason}`).join('；') || '未知错误'}</span></div>`;
     q('#inv15ExportWorkbook').disabled = !audit?.ok;
     q('#inv15ExportReview').hidden=!!audit?.ok;
@@ -869,7 +897,7 @@
     ].map(quoteCsv).join(','));
     const blob = new Blob([`\ufeff${headers.map(quoteCsv).join(',')}\r\n${lines.join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
     const storeName = state?.stores?.find((store) => store.id === selectedStoreId())?.name || '店铺';
-    downloadBlob(blob, `${storeName}_V17.5库存人工处理名单_${new Date().toISOString().slice(0, 10)}.csv`);
+    downloadBlob(blob, `${storeName}_V17.6库存人工处理名单_${new Date().toISOString().slice(0, 10)}.csv`);
   }
 
   async function prepareInventoryStyles(workbook) {
@@ -990,8 +1018,8 @@
     if (!definition) throw new Error('导出时找不到原店铺工作表');
     const sheet = await getSheet(workbook, definition);
     for (const result of session.results) {
-      // V17.5: protected and already-completed rows retain original XML, including cell types.
-      if(result.activityProtected||(result.flow==='already_processed'&&!result.changed))continue;
+      // V17.6: protected and already-completed rows retain original XML, including cell types.
+      if(result.activityProtected||result.preserveRow||(result.flow==='already_processed'&&!result.changed))continue;
       setInventoryTextCell(workbook, sheet, result.row, Number(config.storeSku), result.finalSku);
       if (config.storeStatus) setInventoryTextCell(workbook, sheet, result.row, Number(config.storeStatus), result.status);
       for (const warehouse of warehouses) {
@@ -1029,7 +1057,7 @@
           if (actual !== null && clean(actual) !== '') failures.push(`第${result.row}行 ${warehouse.name} 应为空`);
         } else if (engine.number(actual) !== engine.number(expected)) failures.push(`第${result.row}行 ${warehouse.name} 库存`);
         if(expected!=null&&clean(expected)!==''&&engine.stockNumber(expected)==null&&!result.changed)continue;
-        if(result.activityProtected||(result.flow==='already_processed'&&!result.changed))continue;
+        if(result.activityProtected||result.preserveRow||(result.flow==='already_processed'&&!result.changed))continue;
         const stockCell = rowNode && inv15FindCell(rowNode, Number(warehouse.storeColumn));
         if (expected !== null && expected !== undefined && expected !== '' && stockCell?.hasAttribute('t')) failures.push(`第${result.row}行 ${warehouse.name} 数字格式`);
       }
@@ -1048,7 +1076,7 @@
     try {
       const blob = await buildInventoryWorkbook();
       const storeName = state?.stores?.find((store) => store.id === selectedStoreId())?.name || '店铺';
-      const filename = `${storeName}_V17.5库存更新_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const filename = `${storeName}_V17.6库存更新_${new Date().toISOString().slice(0, 10)}.xlsx`;
       downloadBlob(blob, filename);
       toast(`已生成 ${filename}；原模板结构保留，成品二次识别通过`, 'ok');
     } catch (error) {
@@ -1086,6 +1114,7 @@
     renderBaseMappings();
     renderWarehouseManager();
     renderComboSummary();
+    renderSpecialSkus();
     const threshold = q('#inv15Threshold');
     const overflow = q('#inv15Overflow');
     if (threshold && document.activeElement !== threshold) threshold.value = String(config.threshold);
@@ -1100,12 +1129,12 @@
     page.innerHTML = `
       <section class="inv15-hero">
         <div class="inv15-hero-copy">
-          <div class="eyebrow">Inventory knowledge workspace · V17.5</div>
+
           <h2>四表库存识别</h2>
-          <p>马帮库存、店铺库存、店铺预售和组合明细独立保存。按 SKU ID 关联预售；active 行优先保护；已清零的未预售缺货行跳过；其他 No 且库存≤10查同款，有货单指定仓9999，其余仓写0；缺货清零不报备，组合仍须同仓满足数量。</p>
-          <div class="inv15-hero-badges"><span class="chip good">本机 SQLite</span><span class="chip blue">原格式 Excel</span><span class="chip warn">二次成品复核</span></div>
+
+
         </div>
-        <div class="inv15-hero-state"><span>Knowledge base</span><b id="inv15KnowledgeReady">0 / 4 已就绪</b><small>关闭软件后仍保留</small></div>
+        <div class="inv15-hero-state"><b id="inv15KnowledgeReady">0 / 4 已就绪</b></div>
       </section>
 
       <section class="inv15-sources">
@@ -1144,13 +1173,17 @@
 
       <section class="inv15-panel inv15-mapping-panel">
         <div class="inv15-panel-head">
-          <div><div class="eyebrow">Warehouse mapping</div><h3>仓库与库存列对应</h3><p>马帮仓库按名称关键字包含匹配，可用“|”或逗号填写多个关键字；例如“CFS”可匹配“菲律宾CFS-HB仓-1308”。同一 SKU 在多个马帮仓库有货时只选择可用库存最多的仓库。</p></div>
+          <div><h3>仓库与库存列对应</h3></div>
           <div class="inv15-panel-actions"><span class="chip muted" id="inv15WarehouseCount">2 个仓库</span><button class="btn primary sm" id="inv15AddWarehouse" type="button">＋ 新增仓库</button></div>
         </div>
-        <datalist id="inv15WarehouseValues"></datalist>
+        <datalist id="inv15WarehouseValues"></datalist><div id="inv15WarehousePicker" popover class="inv15-warehouse-picker"></div>
         <div id="inv15WarehouseList" class="inv15-warehouse-list"></div>
       </section>
 
+      <details class="inv15-panel inv15-special-panel"><summary>特殊 SKU</summary><div class="inv15-special-content">
+        <section><h3>跳过识别</h3><div class="inv15-special-inputs"><input id="inv15ExcludeSku" placeholder="SKU 或匹配内容"><select id="inv15ExcludeMode"><option value="exact">完全匹配</option><option value="contains">包含</option></select><button type="button" class="btn primary sm" id="inv15AddExcluded">新增</button></div><div id="inv15ExcludedList"></div></section>
+        <section><h3>关联 SKU</h3><div class="inv15-special-inputs"><input id="inv15RelatedFrom" placeholder="原SKU"><span>→</span><input id="inv15RelatedTo" placeholder="替换SKU"><button type="button" class="btn primary sm" id="inv15AddRelated">新增</button></div><div id="inv15RelatedList"></div></section>
+      </div></details>
       <section class="inv15-command">
         <div class="inv15-command-inputs">
           <label>分析店铺<select id="inv15StoreSelect"></select></label>
@@ -1158,12 +1191,12 @@
           <label>超过阈值写入<input id="inv15Overflow" type="number" value="9999" readonly></label>
         </div>
         <button class="inv15-run" id="inv15Analyze" type="button">执行库存识别</button>
-        <div class="inv15-command-note"><b>严格顺序</b><span>active保护 → 已处理跳过 → 未预售低库存找同款 → 无更优库存写0完成</span></div>
+
       </section>
 
       <section class="inv15-panel inv15-results-panel">
         <div class="inv15-panel-head results">
-          <div><div class="eyebrow">Final inventory review</div><h3>最终库存结果与人工处理名单</h3><p>“活动中 / 异常”进入人工名单；正常缺货清零完成无需报备，不会擅自添加到原 Excel 列中。</p></div>
+          <div><h3>最终库存结果与人工处理名单</h3></div>
           <div class="inv15-panel-actions"><button class="btn light" id="inv15ExportReview" hidden>导出预览供核对</button><button class="btn light" id="inv15ExportManual" disabled>导出人工处理名单</button><button class="btn primary" id="inv15ExportWorkbook" disabled>导出最终店铺库存表</button></div>
         </div>
         <div id="inv15Audit"></div>
@@ -1178,7 +1211,7 @@
             <option value="flow3_same_product_replacement">流程三 · 同款换 SKU</option>
             <option value="manual">全部人工处理</option>
             <option value="presale">已开预售</option>
-            <option value="anomaly">异常标签</option>
+            <option value="anomaly">异常标签</option><option value="special">特殊提示 / 跳过识别</option><option value="related">关联SKU替换</option>
             <option value="activity">活动中</option><option value="processed">已处理 / 清零完成</option>
             <option value="combo">组合 SKU</option>
           </select>
@@ -1199,8 +1232,10 @@
     q('#inv15ComboFile').addEventListener('change', (event) => saveSource('combo', event.target.files?.[0]));
     qa('[data-inv15-clear]').forEach((button) => button.addEventListener('click', () => askClearSource(button.dataset.inv15Clear)));
     q('#inv15AddWarehouse').addEventListener('click', addWarehouse);
+    q('#inv15AddExcluded').onclick=()=>addSpecialRule('excluded');q('#inv15AddRelated').onclick=()=>addSpecialRule('related');
+    q('#inv15WarehousePicker').onclick=event=>{const button=event.target.closest('[data-inv15-pick-value]');if(!button)return;const row=qa('.inv15-warehouse-row[data-warehouse-id]').find(r=>r.dataset.warehouseId===q('#inv15WarehousePicker').dataset.warehouseId);const input=row?.querySelector('[data-inv15-mabang-value]');if(input){input.value=button.dataset.inv15PickValue;updateWarehouse(input);}q('#inv15WarehousePicker').hidePopover();};
     q('#inv15Analyze').addEventListener('click', analyzeInventory);
-    q('#inv15ExportReview').addEventListener('click',async()=>{try{const blob=await buildInventoryWorkbook({reviewOnly:true});downloadBlob(blob,`${state.stores.find(x=>x.id===selectedStoreId())?.name||'店铺'}_库存预览_含待确认行_V17.5.xlsx`)}catch(error){toast(error.message,'err')}});
+    q('#inv15ExportReview').addEventListener('click',async()=>{try{const blob=await buildInventoryWorkbook({reviewOnly:true});downloadBlob(blob,`${state.stores.find(x=>x.id===selectedStoreId())?.name||'店铺'}_库存预览_含待确认行_V17.6.xlsx`)}catch(error){toast(error.message,'err')}});
     q('#inv15ExportManual').addEventListener('click', exportManualList);
     q('#inv15ExportWorkbook').addEventListener('click', exportInventoryWorkbook);
     q('#inv15StoreSelect').addEventListener('change', async (event) => {
@@ -1225,6 +1260,9 @@
     });
     page.addEventListener('input',event=>{if(event.target.matches('[data-inv15-mabang-value]'))updateWarehouse(event.target);});
     page.addEventListener('click', (event) => {
+      const openPicker=event.target.closest('[data-inv15-open-warehouse]');if(openPicker){openWarehousePicker(openPicker);return;}
+      const removeExcluded=event.target.closest('[data-inv15-remove-excluded]'),removeRelated=event.target.closest('[data-inv15-remove-related]');
+      if(removeExcluded||removeRelated){const kind=removeExcluded?'excludedSkus':'relatedSkus',index=Number(removeExcluded?removeExcluded.dataset.inv15RemoveExcluded:removeRelated.dataset.inv15RemoveRelated);config[kind].splice(index,1);saveConfig();clearAnalysis();renderSpecialSkus();return;}
       const clearKeyword=event.target.closest('[data-inv15-clear-keyword]');
       if(clearKeyword){const input=clearKeyword.closest('[data-warehouse-id]').querySelector('[data-inv15-mabang-value]');input.value='';updateWarehouse(input);input.focus();return;}
       const deleteButton = event.target.closest('[data-inv15-delete-warehouse]');
@@ -1239,6 +1277,8 @@
     });
 
     window.addEventListener('country-changed', () => {
+      if(q('#inv15WarehousePicker').matches(':popover-open'))q('#inv15WarehousePicker').hidePopover();
+      for(const id of ['inv15ExcludeSku','inv15RelatedFrom','inv15RelatedTo'])q('#'+id).value='';
       populateStores();config=loadConfig();
       q('#inv15StoreScope').textContent = sourceScope('store');
       // Invalidate immediately; parse saved Excel only when this page is visible.

@@ -1,27 +1,2 @@
-const {app}=require('electron'),fs=require('fs'),path=require('path'),assert=require('node:assert/strict');
-const root=process.env.LAZADA_TEST_APP_ROOT||path.resolve(__dirname,'..'),out=process.env.LAZADA_SWITCH_OUTPUT||'/tmp/lazada-v175-switch';fs.mkdirSync(out,{recursive:true});app.setPath('appData',path.join(out,'profile'));process.argv.push('--playwright-test');
-const stock=fs.readFileSync(path.join(require('os').homedir(),'Downloads/1791797791.xlsx')).toString('base64');
-const timer=setTimeout(()=>app.exit(1),120000);
-app.on('browser-window-created',(_,win)=>win.webContents.once('did-finish-load',async()=>{try{
- await new Promise(r=>setTimeout(r,2400));win.setSize(1440,900);
- const result=await win.webContents.executeJavaScript(`(async()=>{
- const check=(x,m)=>{if(!x)throw Error(m)},sleep=ms=>new Promise(r=>setTimeout(r,ms));
- const api=__inventoryV15;check(api.ready,'inventory loaded');__opsDebug.switchCountry('ph');go('inventory');await sleep(200);
- await api.saveSourceForTest('mabang',new File([Uint8Array.from(atob('${stock}'),c=>c.charCodeAt(0))],'1791797791.xlsx'));
- const source=api.getSession().mabang;check(source,'source ready');
- let input=document.querySelector('[data-inv15-mabang-value]');input.value='typed';input.dispatchEvent(new Event('input',{bubbles:true}));check(api.getConfig().warehouses[0].mabangValue==='typed','typing saved');
- document.querySelector('[data-inv15-clear-keyword]').click();check(input.value===''&&api.getConfig().warehouses[0].mabangValue==='','clear without fallback');
- let select=document.querySelector('[data-inv15-choose-warehouse]');check(select.options.length>1,'full warehouse picker');const name=select.options[1].value;select.value=name;select.dispatchEvent(new Event('change',{bubbles:true}));check(input.value===name&&api.getConfig().warehouses[0].mabangValue===name,'picker applied');
- document.querySelector('[data-inv15-clear-keyword]').click();
- go('activity');state.controlRecords=Array.from({length:10000},(_,i)=>({sku:'T1EE'+String(i).padStart(7,'0'),database_id:state.databases[0].id,library_type:'ordinary',la_price:100,regular_price:90,campaign_price:80,product_name_cn:'性能测试'}));saveState();
- let hiddenRenders=0,oldRender=renderControl;renderControl=function(){hiddenRenders++;return oldRender()};
- const times=[];for(let i=0;i<6;i++){const begin=performance.now();__opsDebug.switchCountry(i%2?'ph':'th');times.push(performance.now()-begin);check(document.querySelector('.page.active').id==='page-activity','stay in activity');check(!api.getSession().mabang,'hidden inventory invalidated');check(!activitySession&&!repricingSession,'old analysis invalidated');}
- renderControl=oldRender;check(hiddenRenders===0,'no hidden control renders');check(state.controlRecords.length===10000,'country state retained');
- for(const page of ['stores','control','settings','history','expenses','changelog','inventory']){go(page);const expected=document.querySelector('.page.active').id;__opsDebug.switchCountry('th');check(document.querySelector('.page.active').id===expected,'retain '+page);__opsDebug.switchCountry('ph');check(document.querySelector('.page.active').id===expected,'return '+page);await sleep(200);}
- await sleep(500);check(api.getSession().mabang===source,'reuse parsed source by isolated slot');check(api.getConfig().warehouses[0].mabangValue==='','empty keyword survives switch');
- document.querySelector('#inv15WarehouseList').scrollIntoView({behavior:'instant',block:'center'});await sleep(400);return{ok:true,times,hiddenRenders,warehouseNames:document.querySelector('[data-inv15-choose-warehouse]').options.length-1,keyword:api.getConfig().warehouses[0].mabangValue};
- })()`);
- assert(result.ok);fs.writeFileSync(path.join(out,'warehouse-editor.png'),(await win.webContents.capturePage()).toPNG());
- const reload=new Promise(r=>win.webContents.once('did-finish-load',r));win.reload();await reload;await new Promise(r=>setTimeout(r,2300));const reloaded=await win.webContents.executeJavaScript(`({keyword:__inventoryV15.getConfig().warehouses[0].mabangValue,records:state.controlRecords.length})`);assert.equal(reloaded.keyword,'');assert.equal(reloaded.records,10000);
- fs.writeFileSync(path.join(out,'report.json'),JSON.stringify({result,reloaded},null,2));console.log('COUNTRY_SWITCH_OK',JSON.stringify({result,reloaded}));clearTimeout(timer);app.exit(0);
- }catch(e){console.error(e);clearTimeout(timer);app.exit(1)}}));require(path.join(root,'electron/main.js'));
+// Latest country-switch and editor regression.
+require('./country-switch-v176.cjs');

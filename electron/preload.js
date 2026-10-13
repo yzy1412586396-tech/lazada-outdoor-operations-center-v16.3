@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-const APP_VERSION = '17.5.0';
-const DISPLAY_VERSION = '17.5';
+const APP_VERSION = '17.6.0';
+const DISPLAY_VERSION = '17.6';
 const usesWindowsSurface = process.platform === 'win32' || process.argv.includes('--windows-surface');
 let databaseReady = false;
 let lastStorage = new Map();
