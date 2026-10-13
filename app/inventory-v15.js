@@ -506,7 +506,7 @@
       <label>SellerSKU（必选）<select data-inv15-base="storeSku">${columnOptions(storeColumns, config.storeSku)}</select></label>
       <label>SKU ID（关联预售）<select data-inv15-base="storeSkuId">${columnOptions(storeColumns, config.storeSkuId)}</select></label>
       <label>店铺商品标题<select data-inv15-base="storeTitle">${columnOptions(storeColumns, config.storeTitle)}</select></label>
-      <label>Status 状态<select data-inv15-base="storeStatus">${columnOptions(storeColumns, config.storeStatus)}</select></label>`;
+      <label>Status 状态（活动保护必选）<select data-inv15-base="storeStatus">${columnOptions(storeColumns, config.storeStatus)}</select></label>`;
     if (mabangBox) mabangBox.innerHTML = `
       <label>库存 SKU 编号（必选）<select data-inv15-base="mabangSku">${columnOptions(mabangColumns, config.mabangSku)}</select></label>
       <label>马帮商品名称<select data-inv15-base="mabangName">${columnOptions(mabangColumns, config.mabangName)}</select></label>
@@ -623,7 +623,7 @@
 
   function readStoreRows(warehouses) {
     const data = session.store;
-    if (!config.storeSku || !config.storeSkuId) throw new Error('店铺库存表必须选择 SellerSKU 和 SKU ID 列');
+    if (!config.storeSku || !config.storeSkuId || !config.storeStatus) throw new Error('店铺库存表必须选择 SellerSKU、SKU ID 和 Status 列（用于活动保护）');
     const presales=readPresaleIndex();
     const rows = [];
     for (let row = data.dataStartRow || data.row + 1; row <= data.sheet.maxRow; row += 1) {
@@ -697,6 +697,7 @@
   }
 
   const FLOW_LABELS = {
+    activity_protected:'活动保护',already_processed:'已处理 · 跳过',stock_cleared:'库存已清零',
     flow1_original_warehouse: '流程一 · 原仓有货',
     flow2_same_sku_other_warehouse: '流程二 · 同 SKU 转仓',
     flow3_same_product_replacement: '流程三 · 同款换 SKU',
@@ -711,7 +712,7 @@
   };
 
   function tagHtml(tag) {
-    const type = tag === engine.TAGS.ANOMALY ? 'danger' : tag === engine.TAGS.UNLISTED ? 'blue' : 'warn';
+    const type = tag === engine.TAGS.ANOMALY ? 'danger' : tag === engine.TAGS.ACTIVITY ? 'blue' : 'warn';
     return `<span class="chip ${type}">${escapeHtml(tag)}</span>`;
   }
 
@@ -727,9 +728,10 @@
   function resultMatchesFilter(result) {
     if (session.filter === 'changed') return result.changed;
     if (session.filter === 'manual') return result.manual;
-    if (session.filter === 'presale') return result.tags.includes(engine.TAGS.PRESALE);
+    if (session.filter === 'presale') return result.presale==='yes';
     if (session.filter === 'anomaly') return result.tags.includes(engine.TAGS.ANOMALY);
-    if (session.filter === 'unlisted') return result.tags.includes(engine.TAGS.UNLISTED);
+    if (session.filter === 'activity') return result.tags.includes(engine.TAGS.ACTIVITY);
+    if (session.filter === 'processed') return ['already_processed','stock_cleared'].includes(result.flow);
     if (session.filter === 'combo') return result.kind === 'combo';
     if (session.filter.startsWith('flow')) return result.flow === session.filter;
     return true;
@@ -758,7 +760,7 @@
       flow2: session.results.filter((item) => item.flow === 'flow2_same_sku_other_warehouse').length,
       flow3: session.results.filter((item) => item.flow === 'flow3_same_product_replacement').length,
       manual: session.results.filter((item) => item.manual).length,
-      presale: session.results.filter((item) => item.tags.includes(engine.TAGS.PRESALE)).length,
+      presale: session.results.filter((item) => item.presale==='yes').length,
       anomaly: session.results.filter((item) => item.tags.includes(engine.TAGS.ANOMALY)).length,
       unlisted: session.results.filter((item) => item.tags.includes(engine.TAGS.UNLISTED)).length,
       combo: session.results.filter((item) => item.kind === 'combo').length,
@@ -804,9 +806,10 @@
       metricButton('flow2_same_sku_other_warehouse', '流程二', counts.flow2),
       metricButton('flow3_same_product_replacement', '流程三', counts.flow3),
       metricButton('manual', '人工处理', counts.manual, 'danger'),
-      metricButton('presale', '预售', counts.presale, 'warn'),
+      metricButton('presale', '已开预售', counts.presale, 'warn'),
       metricButton('anomaly', '异常', counts.anomaly, 'danger'),
-      metricButton('unlisted', '未上架', counts.unlisted, 'blue'),
+      metricButton('activity', '活动中', session.results.filter(r=>r.tags.includes(engine.TAGS.ACTIVITY)).length, 'blue'),
+      metricButton('processed', '已处理/清零',session.results.filter(r=>['already_processed','stock_cleared'].includes(r.flow)).length),
       metricButton('combo', '组合 SKU', counts.combo),
     ].join('');
     const filtered = filteredResults();
@@ -850,7 +853,7 @@
     ].map(quoteCsv).join(','));
     const blob = new Blob([`\ufeff${headers.map(quoteCsv).join(',')}\r\n${lines.join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
     const storeName = state?.stores?.find((store) => store.id === selectedStoreId())?.name || '店铺';
-    downloadBlob(blob, `${storeName}_V17.3库存人工处理名单_${new Date().toISOString().slice(0, 10)}.csv`);
+    downloadBlob(blob, `${storeName}_V17.4库存人工处理名单_${new Date().toISOString().slice(0, 10)}.csv`);
   }
 
   async function prepareInventoryStyles(workbook) {
@@ -971,6 +974,8 @@
     if (!definition) throw new Error('导出时找不到原店铺工作表');
     const sheet = await getSheet(workbook, definition);
     for (const result of session.results) {
+      // V17.4: protected and already-completed rows retain original XML, including cell types.
+      if(result.activityProtected||(result.flow==='already_processed'&&!result.changed))continue;
       setInventoryTextCell(workbook, sheet, result.row, Number(config.storeSku), result.finalSku);
       if (config.storeStatus) setInventoryTextCell(workbook, sheet, result.row, Number(config.storeStatus), result.status);
       for (const warehouse of warehouses) {
@@ -996,10 +1001,10 @@
       if (clean(cellValue(sheet, result.row, Number(config.storeSku))) !== result.finalSku) failures.push(`第${result.row}行 SellerSKU`);
       const rowNode = inv15FindRow(sheet, result.row);
       const skuCell = rowNode && inv15FindCell(rowNode, Number(config.storeSku));
-      if (skuCell?.getAttribute('t') !== 'inlineStr') failures.push(`第${result.row}行 SellerSKU 文本格式`);
+      if (!['inlineStr','s'].includes(skuCell?.getAttribute('t'))) failures.push(`第${result.row}行 SellerSKU 文本格式`);
       if (config.storeStatus) {
         const statusCell = rowNode && inv15FindCell(rowNode, Number(config.storeStatus));
-        if (statusCell?.getAttribute('t') !== 'inlineStr') failures.push(`第${result.row}行 Status 文本格式`);
+        if (!['inlineStr','s'].includes(statusCell?.getAttribute('t'))) failures.push(`第${result.row}行 Status 文本格式`);
       }
       for (const warehouse of warehouses) {
         const expected = result.finalStocks[warehouse.id];
@@ -1008,6 +1013,7 @@
           if (actual !== null && clean(actual) !== '') failures.push(`第${result.row}行 ${warehouse.name} 应为空`);
         } else if (engine.number(actual) !== engine.number(expected)) failures.push(`第${result.row}行 ${warehouse.name} 库存`);
         if(expected!=null&&clean(expected)!==''&&engine.stockNumber(expected)==null&&!result.changed)continue;
+        if(result.activityProtected||(result.flow==='already_processed'&&!result.changed))continue;
         const stockCell = rowNode && inv15FindCell(rowNode, Number(warehouse.storeColumn));
         if (expected !== null && expected !== undefined && expected !== '' && stockCell?.hasAttribute('t')) failures.push(`第${result.row}行 ${warehouse.name} 数字格式`);
       }
@@ -1026,7 +1032,7 @@
     try {
       const blob = await buildInventoryWorkbook();
       const storeName = state?.stores?.find((store) => store.id === selectedStoreId())?.name || '店铺';
-      const filename = `${storeName}_V17.3库存更新_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const filename = `${storeName}_V17.4库存更新_${new Date().toISOString().slice(0, 10)}.xlsx`;
       downloadBlob(blob, filename);
       toast(`已生成 ${filename}；原模板结构保留，成品二次识别通过`, 'ok');
     } catch (error) {
@@ -1078,9 +1084,9 @@
     page.innerHTML = `
       <section class="inv15-hero">
         <div class="inv15-hero-copy">
-          <div class="eyebrow">Inventory knowledge workspace · V17.3</div>
+          <div class="eyebrow">Inventory knowledge workspace · V17.4</div>
           <h2>四表库存识别</h2>
-          <p>马帮库存、店铺库存、店铺预售和组合明细独立保存。按 SKU ID 关联预售；Yes 单仓保持原样，原多仓按确认例外整理；No 且库存≤10查同款，有货只留单仓9999，组合必须同仓满足数量。</p>
+          <p>马帮库存、店铺库存、店铺预售和组合明细独立保存。按 SKU ID 关联预售；active 行优先保护；已清零的未预售缺货行跳过；其他 No 且库存≤10查同款，有货单指定仓9999，其余仓写0；缺货清零不报备，组合仍须同仓满足数量。</p>
           <div class="inv15-hero-badges"><span class="chip good">本机 SQLite</span><span class="chip blue">原格式 Excel</span><span class="chip warn">二次成品复核</span></div>
         </div>
         <div class="inv15-hero-state"><span>Knowledge base</span><b id="inv15KnowledgeReady">0 / 4 已就绪</b><small>关闭软件后仍保留</small></div>
@@ -1136,12 +1142,12 @@
           <label>超过阈值写入<input id="inv15Overflow" type="number" value="9999" readonly></label>
         </div>
         <button class="inv15-run" id="inv15Analyze" type="button">执行库存识别</button>
-        <div class="inv15-command-note"><b>严格顺序</b><span>关联预售 → 同 SKU 最大库存 → 未预售且≤10找同款 → 无更优库存则清空并列人工名单</span></div>
+        <div class="inv15-command-note"><b>严格顺序</b><span>active保护 → 已处理跳过 → 未预售低库存找同款 → 无更优库存写0完成</span></div>
       </section>
 
       <section class="inv15-panel inv15-results-panel">
         <div class="inv15-panel-head results">
-          <div><div class="eyebrow">Final inventory review</div><h3>最终库存结果与人工处理名单</h3><p>“预售 / 异常 / 未上架”标签只进入人工名单，不会擅自添加到原 Excel 列中。</p></div>
+          <div><div class="eyebrow">Final inventory review</div><h3>最终库存结果与人工处理名单</h3><p>“活动中 / 异常”进入人工名单；正常缺货清零完成无需报备，不会擅自添加到原 Excel 列中。</p></div>
           <div class="inv15-panel-actions"><button class="btn light" id="inv15ExportReview" hidden>导出预览供核对</button><button class="btn light" id="inv15ExportManual" disabled>导出人工处理名单</button><button class="btn primary" id="inv15ExportWorkbook" disabled>导出最终店铺库存表</button></div>
         </div>
         <div id="inv15Audit"></div>
@@ -1155,9 +1161,9 @@
             <option value="flow2_same_sku_other_warehouse">流程二 · 同 SKU 转仓</option>
             <option value="flow3_same_product_replacement">流程三 · 同款换 SKU</option>
             <option value="manual">全部人工处理</option>
-            <option value="presale">预售标签</option>
+            <option value="presale">已开预售</option>
             <option value="anomaly">异常标签</option>
-            <option value="unlisted">未上架标签</option>
+            <option value="activity">活动中</option><option value="processed">已处理 / 清零完成</option>
             <option value="combo">组合 SKU</option>
           </select>
           <span id="inv15ResultCount">尚未分析</span>
@@ -1178,7 +1184,7 @@
     qa('[data-inv15-clear]').forEach((button) => button.addEventListener('click', () => askClearSource(button.dataset.inv15Clear)));
     q('#inv15AddWarehouse').addEventListener('click', addWarehouse);
     q('#inv15Analyze').addEventListener('click', analyzeInventory);
-    q('#inv15ExportReview').addEventListener('click',async()=>{try{const blob=await buildInventoryWorkbook({reviewOnly:true});downloadBlob(blob,`${state.stores.find(x=>x.id===selectedStoreId())?.name||'店铺'}_库存预览_含待确认行_V17.3.xlsx`)}catch(error){toast(error.message,'err')}});
+    q('#inv15ExportReview').addEventListener('click',async()=>{try{const blob=await buildInventoryWorkbook({reviewOnly:true});downloadBlob(blob,`${state.stores.find(x=>x.id===selectedStoreId())?.name||'店铺'}_库存预览_含待确认行_V17.4.xlsx`)}catch(error){toast(error.message,'err')}});
     q('#inv15ExportManual').addEventListener('click', exportManualList);
     q('#inv15ExportWorkbook').addEventListener('click', exportInventoryWorkbook);
     q('#inv15StoreSelect').addEventListener('change', async (event) => {
