@@ -14,4 +14,8 @@ a=run([store('T5HH1850591',{stocks:{a:0,b:0,u:100}})],[stock('T5HH1850591',11,40
 const combo=new Map([['T3HH0623544X1',{components:[{sku:'T5HH1850591',quantity:3},{sku:'T4HH1234567',quantity:2}]}]]);
 a=run([store('T3HH0623544X1')],[stock('T5HH1850591',3,0),stock('T4HH1234567',0,2)],combo);assert.equal(a.results[0].flow,'stock_cleared');assert(!a.results[0].manual);assert.deepEqual(a.results[0].finalStocks,{a:0,b:0,u:0});
 a=run([store('T5HH1850591')],[stock('T5HH1850591',6,0),stock('T5HH1850591',8,0)]);assert(a.results[0].manual);assert.equal(a.results[0].flow,'manual_mabang_unknown');
+a=run([store('T3HH0623544X1',{stocks:{a:0,b:0,u:0}})],[stock('T5HH1850591',3,0),stock('T4HH1234567',2,0)],combo);assert.equal(a.results[0].flow,'combo_healthy');
+a=run([store('T3HH0623544X1',{stocks:{a:0,b:0,u:0}})],[stock('T5HH1850591',2,0),stock('T4HH1234567',2,0)],combo);assert.equal(a.results[0].flow,'already_processed');assert(!a.results[0].changed&&!a.results[0].manual);
+a=run([store('T3HH0623544X1',{status:'active'})],[stock('T5HH1850591',3,0),stock('T4HH1234567',2,0)],combo);assert(!a.results[0].manual);assert(!a.results[0].tags.includes('活动中'));assert(!a.results[0].changed);
+a=run([store('T3HH0623544X1',{status:'active',stocks:{a:0,b:0,u:0}})],[stock('T5HH1850591',2,0),stock('T4HH1234567',2,0)],combo);assert.equal(a.results[0].flow,'already_processed');assert(!a.results[0].changed);
 console.log('INVENTORY_V174_UNIT_OK');
