@@ -33,3 +33,6 @@
 .inv15-sku-change{flex-wrap:wrap}
 
 .inv15-panel-actions [hidden]{display:none!important}
+
+/* V17.5 warehouse keyword editor: editable text and full, unfiltered picker. */
+.inv15-keyword-editor{display:flex;gap:6px;align-items:center}.inv15-keyword-editor input{min-width:0;flex:1}.inv15-keyword-editor button{flex:none}.inv15-warehouse-row [data-inv15-choose-warehouse]{margin-top:6px;max-width:100%}

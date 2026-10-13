@@ -5,7 +5,7 @@
   if (root) root.InventoryEngineV15 = Object.freeze(api);
 })(typeof window !== 'undefined' ? window : globalThis, () => {
   'use strict';
-  const VERSION = '17.4';
+  const VERSION = '17.5';
   const TAGS = Object.freeze({PRESALE:'预售',ANOMALY:'异常',UNLISTED:'未上架',OPENED:'已开预售',ACTIVITY:'活动中'});
   const clean = value => String(value ?? '').trim();
   const normalizeRawSku = value => clean(value).replace(/\s+/g,'').toUpperCase();

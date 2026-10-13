@@ -397,7 +397,7 @@ function showModal(title,html,onOk){$('#modalTitle').textContent=title;$('#modal
 $('#modalCancel').onclick=()=>$('#modal').classList.add('hidden');
 const themeShortcutBtn=$('#themeShortcutBtn');if(themeShortcutBtn)themeShortcutBtn.onclick=()=>{go('settings');setTimeout(()=>$('#appearancePanel')?.scrollIntoView({behavior:'smooth',block:'start'}),80)};
 
-function go(page){$$('.page').forEach(x=>x.classList.toggle('active',x.id==='page-'+page));$$('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===page));const titles={dashboard:['运营总览','查看控价库、店铺商品和近期处理情况'],stores:['店铺管理','按店铺维护商品底库、早鸟价和主推商品'],control:['控价数据库','管理平时、大促、泳池、电池和组合商品的安全价格'],activity:['活动报名','识别平台模板、审核利润风险并生成可报名文件'],repricing:['全店改价','按控价回填 SpecialPrice，可选择早鸟价规则'],dailyreport:['日报汇总','自动导入菲律宾 / 泰国店铺数据并生成日报结果表'],history:['操作记录','查看每次活动报名和改价的处理结果'],settings:['数据设置','备份、恢复和管理本地数据']};$('#pageTitle').textContent=titles[page][0];$('#pageSub').textContent=titles[page][1];window.scrollTo({top:0});document.querySelector('.main')?.scrollTo({top:0,left:0,behavior:'auto'});if(page==='stores')renderStores();if(page==='control')renderControl();if(page==='dailyreport'&&window.loadDailyReportModule)window.loadDailyReportModule();if(page==='history')renderHistory()}
+function go(page){$$('.page').forEach(x=>x.classList.toggle('active',x.id==='page-'+page));$$('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===page));const titles={dashboard:['运营总览','查看控价库、店铺商品和近期处理情况'],stores:['店铺管理','按店铺维护商品底库、早鸟价和主推商品'],control:['控价数据库','管理平时、大促、泳池、电池和组合商品的安全价格'],activity:['活动报名','识别平台模板、审核利润风险并生成可报名文件'],repricing:['全店改价','按控价回填 SpecialPrice，可选择早鸟价规则'],dailyreport:['日报汇总','自动导入菲律宾 / 泰国店铺数据并生成日报结果表'],history:['操作记录','查看每次活动报名和改价的处理结果'],settings:['数据设置','备份、恢复和管理本地数据']};$('#pageTitle').textContent=titles[page][0];$('#pageSub').textContent=titles[page][1];window.scrollTo({top:0});document.querySelector('.main')?.scrollTo({top:0,left:0,behavior:'auto'});if(page==='dashboard')renderDashboard();if(page==='settings'){renderAppearance();renderTitleRules()}if(page==='stores')renderStores();if(page==='control'){renderDatabases();renderControl()}if(page==='dailyreport'&&window.loadDailyReportModule)window.loadDailyReportModule();if(page==='history')renderHistory()}
 $$('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.page));$$('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
 
 function activeStores(){return state.stores.filter(s=>s.active!==false)}
@@ -411,7 +411,9 @@ function fillDatabaseSelects(){
 }
 function renderDatabases(){const box=$('#databaseCards');if(!box)return;const current=selectedControlDatabaseId();box.innerHTML=(state.databases||[]).map(d=>{const n=(state.controlRecords||[]).filter(r=>(r.database_id||state.databases[0].id)===d.id).length;const c=(state.controlConflicts||[]).filter(r=>(r.database_id||state.databases[0].id)===d.id).length;return `<div class="store-card ${d.id===current?'selected':''}" data-db-card="${esc(d.id)}"><strong>${esc(d.name)}</strong><div class="meta">有效控价 ${n} · 冲突 ${c}<br>普通商品库 + 泳池专用库</div></div>`}).join('');$$('[data-db-card]').forEach(el=>el.onclick=()=>{$('#controlDatabase').value=el.dataset.dbCard;$('#controlImportDatabase').value=el.dataset.dbCard;renderControl();renderDatabases()})}
 function fillStoreSelects(){const opts=activeStores().map(s=>`<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');['#actStore','#repStore'].forEach(sel=>{const old=$(sel)?.value;if($(sel)){$(sel).innerHTML=opts;if(old&&activeStores().some(s=>s.id===old))$(sel).value=old}});$('#aliasStore').innerHTML='<option value="">全局适用</option>'+opts;$('#topStore').textContent=activeStores().length+' 个店铺';}
-function renderAll(){renderRepricingOptions();fillStoreSelects();fillDatabaseSelects();renderDashboard();renderStores();renderDatabases();renderControl();renderHistory();fillPresets();renderAppearance();renderTitleRules();renderActivityOptions()}
+// V17.5: never build large hidden tables when switching countries. Navigation
+// refreshes the destination module from the currently isolated country state.
+function renderAll(){renderRepricingOptions();fillStoreSelects();fillDatabaseSelects();fillPresets();renderActivityOptions();const page=document.querySelector('.page.active')?.id; if(page==='page-dashboard')renderDashboard();if(page==='page-stores')renderStores();if(page==='page-control'){renderDatabases();renderControl()}if(page==='page-history')renderHistory();if(page==='page-settings'){renderAppearance();renderTitleRules()}}
 // V17.1：预设用自绘列表提供独立删除按钮，隐藏 select 兼容旧工作流。
 function fillPresets(){
  const select=$('#actPreset'),old=select.value;select.innerHTML='<option value="">手动输入</option>'+state.presets.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
@@ -782,13 +784,16 @@ renderAll();
   // Saved title rules are authoritative, including deliberately empty lists.
   return x;
  }
+ const countryStateCache=new Map();
  function loadCountryState(country){
+  if(countryStateCache.has(country))return countryStateCache.get(country);
   try{
    let raw=localStorage.getItem(COUNTRY_STORAGE[country]);
    if(!raw&&country==='ph')raw=localStorage.getItem(LEGACY_STORAGE_KEY);
    const x=raw?JSON.parse(raw):blankCountrySeed(country);
    const migrated=migrateCountryState(x,country);
    localStorage.setItem(COUNTRY_STORAGE[country],JSON.stringify(migrated));
+   countryStateCache.set(country,migrated);
    return migrated;
   }catch(e){console.warn(e);return migrateCountryState(blankCountrySeed(country),country)}
  }
@@ -829,8 +834,15 @@ renderAll();
  function switchCountry(country){
   if(!['ph','th'].includes(country)||country===window.currentCountry)return;
   try{localStorage.setItem(COUNTRY_STORAGE[window.currentCountry],JSON.stringify(state))}catch(e){}
+  // Cache each country by identity, not a clone shared with another country.
+  // Keep the page and scroll position; reset country-bound analyses before
+  // repainting so an old result can never be exported in the new country.
+  countryStateCache.set(window.currentCountry,state);
   window.currentCountry=country;localStorage.setItem(COUNTRY_STORAGE_KEY,country);
-  state=loadCountryState(country);selectedStoreId=state.stores[0]?.id||'';resetTransientUI();renderAll();updateCountryUI();go('dashboard');toast('已切换到'+countryInfo().label);
+  controlIndexCache=null;
+  state=loadCountryState(country);selectedStoreId=state.stores[0]?.id||'';resetTransientUI();renderAll();updateCountryUI();
+  window.dispatchEvent(new CustomEvent('country-changed',{detail:{country}}));
+  toast('已切换到'+countryInfo().label);
  }
  document.querySelectorAll('[data-country]').forEach(b=>b.onclick=()=>switchCountry(b.dataset.country));
 

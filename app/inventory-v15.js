@@ -72,9 +72,10 @@
 
   let config = loadConfig();
 
+  let configFlushTimer;
   function saveConfig() {
     localStorage.setItem(configKey(), JSON.stringify(config));
-    window.desktopApp?.database?.flush();
+    clearTimeout(configFlushTimer);configFlushTimer=setTimeout(()=>window.desktopApp?.database?.flush(),450);
   }
 
   function toast(message, type = 'ok') {
@@ -402,6 +403,7 @@
       });
       if(sourceContext!==contextKey())return;
       session[kind] = parsed;
+      cacheSource(slot,parsed);
       if (kind !== 'combo') applySavedMappings(kind, parsed);
       clearAnalysis();
       renderAllInventory();
@@ -417,14 +419,25 @@
     }
   }
 
+  // Parsed workbooks are immutable source data. Keep a bounded cache by upload
+  // slot and revision; mappings and results remain scoped to country + store.
+  const parsedSourceCache = new Map();
+  let sourcesNeedRestore=false;
+  function cacheSource(slot, source) {
+    parsedSourceCache.delete(slot);parsedSourceCache.set(slot, source);
+    while(parsedSourceCache.size>12)parsedSourceCache.delete(parsedSourceCache.keys().next().value);
+  }
   async function restoreSource(kind, token = session.restoreToken) {
     try {
-      const record = await window.desktopApp.uploads.read(slotFor(kind));
+      const slot=slotFor(kind);
+      const record = await window.desktopApp.uploads.read(slot);
       if (token !== session.restoreToken) return;
       if (!record) {
-        session[kind] = null;
+        session[kind] = null;parsedSourceCache.delete(slot);
         return;
       }
+      const cached=parsedSourceCache.get(slot);
+      if(cached && cached.updatedAt===record.updatedAt && cached.name===record.name){session[kind]=cached;if(kind!=='combo')applySavedMappings(kind,cached);return;}
       const buffer = bytesToArrayBuffer(record.content);
       const parsed = await parseSource(kind, buffer);
       if (token !== session.restoreToken) return;
@@ -435,6 +448,7 @@
         updatedAt: record.updatedAt,
       });
       session[kind] = parsed;
+      cacheSource(slot,parsed);
       if (kind !== 'combo') applySavedMappings(kind, parsed);
     } catch (error) {
       console.error(`Unable to restore inventory ${kind}:`, error);
@@ -444,6 +458,7 @@
   }
 
   async function restoreAllSources(options = {}) {
+    sourcesNeedRestore=false;
     const token = ++session.restoreToken;
     session.restoring = true;
     renderSourceStatuses();
@@ -465,6 +480,7 @@
   async function clearSource(kind) {
     const sourceContext=contextKey(),slot=slotFor(kind);
     await window.desktopApp.uploads.remove(slot);
+    parsedSourceCache.delete(slot);
     if(sourceContext!==contextKey())return;
     session[kind] = null;
     clearAnalysis();
@@ -524,7 +540,7 @@
         <label>仓库显示名称<input data-inv15-warehouse-name value="${escapeHtml(warehouse.name)}" placeholder="例如：CFS"></label>
         <label>店铺库存列<select data-inv15-store-column>${columnOptions(storeColumns, warehouse.storeColumn)}</select></label>
         <label>马帮库存列<select data-inv15-mabang-stock>${columnOptions(mabangColumns, warehouse.mabangStockColumn)}</select></label>
-        <label>马帮仓库名称关键字<input data-inv15-mabang-value list="inv15WarehouseValues" value="${escapeHtml(warehouse.mabangValue)}" placeholder="包含匹配，可用 | 分隔多个关键字"></label>
+        <label>马帮仓库名称关键字<span class="inv15-keyword-editor"><input data-inv15-mabang-value value="${escapeHtml(warehouse.mabangValue)}" placeholder="填写关键字，或从下方选择"><button type="button" class="btn light sm" data-inv15-clear-keyword aria-label="清空 ${escapeHtml(warehouse.name)} 仓库关键字">清空</button></span><select data-inv15-choose-warehouse aria-label="重新选择 ${escapeHtml(warehouse.name)} 马帮仓库"><option value="">选择马帮仓库…</option>${distinctWarehouseValues().map(value=>`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('')}</select></label>
         <button class="btn danger sm" type="button" data-inv15-delete-warehouse>删除</button>
       </div>`).join('') : '<div class="inv15-empty">还没有仓库映射，请新增仓库。</div>';
     q('#inv15WarehouseCount').textContent = `${config.warehouses.length} 个仓库`;
@@ -853,7 +869,7 @@
     ].map(quoteCsv).join(','));
     const blob = new Blob([`\ufeff${headers.map(quoteCsv).join(',')}\r\n${lines.join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
     const storeName = state?.stores?.find((store) => store.id === selectedStoreId())?.name || '店铺';
-    downloadBlob(blob, `${storeName}_V17.4库存人工处理名单_${new Date().toISOString().slice(0, 10)}.csv`);
+    downloadBlob(blob, `${storeName}_V17.5库存人工处理名单_${new Date().toISOString().slice(0, 10)}.csv`);
   }
 
   async function prepareInventoryStyles(workbook) {
@@ -974,7 +990,7 @@
     if (!definition) throw new Error('导出时找不到原店铺工作表');
     const sheet = await getSheet(workbook, definition);
     for (const result of session.results) {
-      // V17.4: protected and already-completed rows retain original XML, including cell types.
+      // V17.5: protected and already-completed rows retain original XML, including cell types.
       if(result.activityProtected||(result.flow==='already_processed'&&!result.changed))continue;
       setInventoryTextCell(workbook, sheet, result.row, Number(config.storeSku), result.finalSku);
       if (config.storeStatus) setInventoryTextCell(workbook, sheet, result.row, Number(config.storeStatus), result.status);
@@ -1032,7 +1048,7 @@
     try {
       const blob = await buildInventoryWorkbook();
       const storeName = state?.stores?.find((store) => store.id === selectedStoreId())?.name || '店铺';
-      const filename = `${storeName}_V17.4库存更新_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const filename = `${storeName}_V17.5库存更新_${new Date().toISOString().slice(0, 10)}.xlsx`;
       downloadBlob(blob, filename);
       toast(`已生成 ${filename}；原模板结构保留，成品二次识别通过`, 'ok');
     } catch (error) {
@@ -1084,7 +1100,7 @@
     page.innerHTML = `
       <section class="inv15-hero">
         <div class="inv15-hero-copy">
-          <div class="eyebrow">Inventory knowledge workspace · V17.4</div>
+          <div class="eyebrow">Inventory knowledge workspace · V17.5</div>
           <h2>四表库存识别</h2>
           <p>马帮库存、店铺库存、店铺预售和组合明细独立保存。按 SKU ID 关联预售；active 行优先保护；已清零的未预售缺货行跳过；其他 No 且库存≤10查同款，有货单指定仓9999，其余仓写0；缺货清零不报备，组合仍须同仓满足数量。</p>
           <div class="inv15-hero-badges"><span class="chip good">本机 SQLite</span><span class="chip blue">原格式 Excel</span><span class="chip warn">二次成品复核</span></div>
@@ -1184,7 +1200,7 @@
     qa('[data-inv15-clear]').forEach((button) => button.addEventListener('click', () => askClearSource(button.dataset.inv15Clear)));
     q('#inv15AddWarehouse').addEventListener('click', addWarehouse);
     q('#inv15Analyze').addEventListener('click', analyzeInventory);
-    q('#inv15ExportReview').addEventListener('click',async()=>{try{const blob=await buildInventoryWorkbook({reviewOnly:true});downloadBlob(blob,`${state.stores.find(x=>x.id===selectedStoreId())?.name||'店铺'}_库存预览_含待确认行_V17.4.xlsx`)}catch(error){toast(error.message,'err')}});
+    q('#inv15ExportReview').addEventListener('click',async()=>{try{const blob=await buildInventoryWorkbook({reviewOnly:true});downloadBlob(blob,`${state.stores.find(x=>x.id===selectedStoreId())?.name||'店铺'}_库存预览_含待确认行_V17.5.xlsx`)}catch(error){toast(error.message,'err')}});
     q('#inv15ExportManual').addEventListener('click', exportManualList);
     q('#inv15ExportWorkbook').addEventListener('click', exportInventoryWorkbook);
     q('#inv15StoreSelect').addEventListener('change', async (event) => {
@@ -1205,8 +1221,12 @@
       const target = event.target;
       if (target.matches('[data-inv15-base]')) updateBaseMapping(target);
       if (target.matches('[data-inv15-warehouse-name],[data-inv15-store-column],[data-inv15-mabang-stock],[data-inv15-mabang-value]')) updateWarehouse(target);
+      if(target.matches('[data-inv15-choose-warehouse]')&&target.value){const input=target.closest('[data-warehouse-id]').querySelector('[data-inv15-mabang-value]');input.value=target.value;updateWarehouse(input);target.value='';}
     });
+    page.addEventListener('input',event=>{if(event.target.matches('[data-inv15-mabang-value]'))updateWarehouse(event.target);});
     page.addEventListener('click', (event) => {
+      const clearKeyword=event.target.closest('[data-inv15-clear-keyword]');
+      if(clearKeyword){const input=clearKeyword.closest('[data-warehouse-id]').querySelector('[data-inv15-mabang-value]');input.value='';updateWarehouse(input);input.focus();return;}
       const deleteButton = event.target.closest('[data-inv15-delete-warehouse]');
       if (deleteButton) deleteWarehouse(deleteButton.closest('[data-warehouse-id]').dataset.warehouseId);
       const metric = event.target.closest('[data-inv15-filter]');
@@ -1218,18 +1238,24 @@
       }
     });
 
-    qa('#countrySwitch [data-country]').forEach((button) => button.addEventListener('click', () => setTimeout(() => {
+    window.addEventListener('country-changed', () => {
       populateStores();config=loadConfig();
       q('#inv15StoreScope').textContent = sourceScope('store');
-      restoreAllSources();
-    }, 100)));
-    q('#nav [data-page="inventory"]')?.addEventListener('click', () => setTimeout(populateStores, 0));
+      // Invalidate immediately; parse saved Excel only when this page is visible.
+      ++session.restoreToken;session.restoring=false;sourcesNeedRestore=true;
+      session.store=session.presale=session.mabang=session.combo=null;clearAnalysis();
+      renderAllInventory();
+      if(q('#page-inventory').classList.contains('active'))restoreAllSources();
+    });
+    q('#nav [data-page="inventory"]')?.addEventListener('click', () => {populateStores();if(!session.store&&!session.restoring)restoreAllSources();});
     window.addEventListener('stores-changed-v14', (event) => {
       const requested = clean(event.detail?.selectedStoreId);
       if ((state?.stores || []).some((store) => store.id === requested)) session.storeId = requested;
       populateStores();
     });
 
+    const previousGo=go;
+    go=function(page){const result=previousGo(page);if(page==='inventory'){populateStores();if(sourcesNeedRestore&&!session.restoring)restoreAllSources();}return result;};
     renderAllInventory();
     restoreAllSources();
   }
