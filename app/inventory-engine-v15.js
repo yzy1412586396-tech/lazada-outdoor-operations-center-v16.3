@@ -5,7 +5,7 @@
   if (root) root.InventoryEngineV15 = Object.freeze(api);
 })(typeof window !== 'undefined' ? window : globalThis, () => {
   'use strict';
-  const VERSION = '18.0';
+  const VERSION = '18.1';
   const TAGS = Object.freeze({PRESALE:'预售',ANOMALY:'异常',UNLISTED:'未上架',OPENED:'已开预售',SPECIAL:'特殊提示'});
   const clean = value => String(value ?? '').trim();
   const normalizeRawSku = value => clean(value).replace(/\s+/g,'').toUpperCase();
@@ -151,6 +151,8 @@
       const freeze=(tag,flow,reason)=>{r.preserveRow=true;mark(tag,flow,reason)};
       const policy=info.kind==='combo'?comboPolicy(info.canonical):null;
       if(policy){r.mabangName=policy.name;r.componentChecks=policy.checks;}
+      // Left-hand SKU keeps its own source name even when final SKU is replaced.
+      r.originalMabangName=r.mabangName;
       const low=policy?policy.low:!!(exact&&!exact.conflict&&exact.best&&exact.best.stock<=10);
       const unknown=policy?!policy.known:!exact||exact.conflict||!exact.best;
       const mappedZero=warehouses.every(w=>number(originalStocks[w.id])===0);

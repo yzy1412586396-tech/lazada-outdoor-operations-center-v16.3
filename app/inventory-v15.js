@@ -23,6 +23,7 @@
     restoring: false,
     restoreToken: 0,
     exporting: false,
+    uploading:new Set(),
   };
 
   const q = (selector, root = document) => root.querySelector(selector);
@@ -388,10 +389,10 @@
 
   function sourceStatusHtml(kind) {
     const source = session[kind];
-    if (!source) return `<div class="inv15-source-empty"><b>尚未保存</b><span>${escapeHtml(sourceScope(kind))} · 上传后下次自动恢复</span></div>`;
+    if (!source) return '<div class="inv15-source-empty"><b>尚未保存</b></div>';
     const details = kind === 'combo'
       ? `${source.comboMap.size} 个组合 · ${source.componentReferences} 个组件引用`
-      : `${escapeHtml(source.definition.name)} · 表头第 ${source.row} 行 · 数据从第 ${source.dataStartRow || source.row + 1} 行开始 · ${source.sheet.maxRow} 行`;
+      : `${Math.max(0,source.sheet.maxRow-(source.dataStartRow||source.row+1)+1)} 行`;
     return `<div class="inv15-source-saved"><div><b>${escapeHtml(source.name)}</b><span>${details}</span></div><div><span>${formatBytes(source.size)}</span><span>${formatDate(source.updatedAt)}</span></div></div>`;
   }
 
@@ -418,6 +419,7 @@
 
   async function saveSource(kind, file) {
     if (!file) return;
+    const uploadScope=slotFor(kind);if(session.uploading.has(uploadScope))return toast('此表正在导入，请稍候','err');session.uploading.add(uploadScope);
     const status = q(`#inv15${kind[0].toUpperCase()}${kind.slice(1)}Status`);
     const scrollTop = window.scrollY;
     const sourceContext=contextKey(),slot=slotFor(kind);
@@ -449,6 +451,7 @@
       renderSourceStatuses();
       toast(`${sourceLabel(kind)}读取失败：${error.message}`, 'err');
     } finally {
+      session.uploading.delete(uploadScope);
       const input = q(`#inv15${kind[0].toUpperCase()}${kind.slice(1)}File`);
       if (input) { input.value = ''; input.blur(); }
       requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo({ top: scrollTop, left: 0, behavior: 'auto' })));
@@ -792,7 +795,10 @@
     }).join('');
   }
 
+  // Review-only classification follows final saved status, including manual edits.
+  function needsDelisting(r){return r.changed&&!r.preserveRow&&!r.blacklisted&&clean(r.status).toLowerCase()!=='inactive'&&clean(r.finalStatus).toLowerCase()==='inactive';}
   function resultMatchesFilter(result) {
+    if(session.filter==='delist')return needsDelisting(result);
     if(session.filter==='actionable')return result.changed||result.manual;
     if(session.filter==='relist')return result.pendingRelist;
     if(session.filter==='closepresale')return result.needsClosePresale;
@@ -850,7 +856,7 @@
     const locked=r.frozen||r.pendingRelist||r.blacklisted||r.relistDecision==='kept',disabled=locked?'disabled':'';
     const draft=session.reviewDrafts.get(r.row);const shown=draft?{...r,...draft,finalStocks:{...r.finalStocks,...draft.finalStocks}}:r;
     return `<tr class="inv15-result ${r.pendingRelist?'inv18-urgent':r.manual?'manual':r.changed?'changed':'clean'}" data-review-row="${r.row}" ${draft?'data-dirty="true"':''}>
-      <td><span class="inv18-source-row">第${r.row}行 · ${escapeHtml(r.skuId)}</span><strong>${escapeHtml(r.originalSku)}</strong><small title="${escapeHtml(r.title)}">${escapeHtml(r.title)}</small><div class="inv15-tags">${r.tags.map(tagHtml).join('')}<span class="chip muted">${escapeHtml(FLOW_LABELS[r.flow]||r.flow)}</span></div></td>
+      <td><span class="inv18-source-row">第${r.row}行 · ${escapeHtml(r.skuId)}</span><strong>${escapeHtml(r.originalSku)}</strong><small class="inv18-mabang-name" title="${escapeHtml(r.originalMabangName||'')}">马帮中文名：${escapeHtml(r.originalMabangName||'未匹配中文名称')}</small><small title="${escapeHtml(r.title)}">${escapeHtml(r.title)}</small><div class="inv15-tags">${needsDelisting(r)?'<span class="chip warn">需下架</span>':''}${r.tags.map(tagHtml).join('')}<span class="chip muted">${escapeHtml(FLOW_LABELS[r.flow]||r.flow)}</span></div></td>
       <td><label class="inv18-mini-label">最终 SellerSKU</label><input data-review-sku value="${escapeHtml(shown.finalSku)}" ${disabled}><small>${r.presale==='yes'?'预售 Yes':r.presale==='no'?'预售 No':'预售未知'}</small><small>原状态 ${escapeHtml(r.status)}</small><select data-review-status ${disabled}><option value="active" ${shown.finalStatus==='active'?'selected':''}>active · 上架</option><option value="inactive" ${shown.finalStatus==='inactive'?'selected':''}>inactive · 下架</option></select></td>
       <td><div class="inv18-stocks">${warehouses.filter(w=>!r.forbiddenWarehouseIds.includes(w.id)).map(w=>reviewStockInput(r,shown,w,disabled)).join('')}</div>${r.forbiddenWarehouseIds.length?`<details class="inv18-other-stock"><summary>非指定仓 · ${r.forbiddenWarehouseIds.length} 个${r.forbiddenWarehouseIds.some(id=>engine.number(r.originalStocks[id])>0)?' · 原有库存':''}</summary><div class="inv18-stocks">${warehouses.filter(w=>r.forbiddenWarehouseIds.includes(w.id)).map(w=>reviewStockInput(r,shown,w,'disabled')).join('')}</div></details>`:''}</td>
       <td><div class="inv18-reasons">${r.reasons.map(x=>`<p>${escapeHtml(x)}</p>`).join('')}${r.pendingRelist&&r.proposal?`<b>建议 ${escapeHtml(r.proposal.finalSku)}</b><p>${warehouses.filter(w=>engine.number(r.proposal.finalStocks[w.id])>0).map(w=>escapeHtml(w.name)+'：'+r.proposal.finalStocks[w.id]).join('；')}</p>`:''}</div><div class="inv18-actions">${r.pendingRelist?`<div class="inv18-actions"><button class="btn primary sm" data-relist="yes">同意上架</button><button class="btn light sm" data-relist="no">保持下架</button></div>`:!locked?'<button class="btn light sm" data-save-review>保存本行修改</button>':''}${r.relistDecision&&!r.blacklisted&&!r.frozen?'<button class="btn light sm" data-reconsider>重新选择上架处理</button>':''}</div></td>
@@ -866,6 +872,7 @@
       metricButton('actionable','需要处理',session.results.filter(r=>r.changed||r.manual).length),
       metricButton('unchanged','无需调整',session.results.filter(r=>!r.changed&&!r.manual).length),
       metricButton('changed', '将修改', counts.changed, 'good'),
+      metricButton('delist','需下架',session.results.filter(needsDelisting).length,'warn'),
       metricButton('flow1_original_warehouse', '流程一', counts.flow1),
       metricButton('flow2_same_sku_other_warehouse', '流程二', counts.flow2),
       metricButton('flow3_same_product_replacement', '流程三', counts.flow3),
@@ -922,7 +929,7 @@
     ].map(quoteCsv).join(','));
     const blob = new Blob([`\ufeff${headers.map(quoteCsv).join(',')}\r\n${lines.join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
     const storeName = state?.stores?.find((store) => store.id === selectedStoreId())?.name || '店铺';
-    downloadBlob(blob, `${storeName}_V18.0库存人工处理名单_${new Date().toISOString().slice(0, 10)}.csv`);
+    downloadBlob(blob, `${storeName}_V18.1库存人工处理名单_${new Date().toISOString().slice(0, 10)}.csv`);
   }
 
   async function prepareInventoryStyles(workbook) {
@@ -1044,7 +1051,7 @@
     if (!definition) throw new Error('导出时找不到原店铺工作表');
     const sheet = await getSheet(workbook, definition);
     for (const result of session.results) {
-      // V18.0: protected and already-completed rows retain original XML, including cell types.
+      // V18.1: protected and already-completed rows retain original XML, including cell types.
       if(result.preserveRow||(result.flow==='already_processed'&&!result.changed))continue;
       setInventoryTextCell(workbook, sheet, result.row, Number(config.storeSku), result.finalSku);
       if (config.storeStatus) setInventoryTextCell(workbook, sheet, result.row, Number(config.storeStatus), result.finalStatus);
@@ -1104,7 +1111,7 @@
     try {
       const blob = await buildInventoryWorkbook();
       const storeName = state?.stores?.find((store) => store.id === selectedStoreId())?.name || '店铺';
-      const filename = `${storeName}_V18.0库存更新_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const filename = `${storeName}_V18.1库存更新_${new Date().toISOString().slice(0, 10)}.xlsx`;
       downloadBlob(blob, filename);
       toast(`已生成 ${filename}；原模板结构保留，成品二次识别通过`, 'ok');
     } catch (error) {
@@ -1150,6 +1157,16 @@
     if (session.results.length) renderResults();
   }
 
+  function installCardDropZones(page){
+    let hideTimer;const cards=qa('.inv15-source-card',page),kinds=['store','mabang','presale','combo'];
+    const reset=()=>{clearTimeout(hideTimer);page.classList.remove('inv181-files-drag');cards.forEach(card=>card.classList.remove('inv181-drop-target'));};
+    const isFileDrag=event=>Array.from(event.dataTransfer?.types||[]).includes('Files');
+    for(const card of cards){const kind=kinds.find(key=>card.classList.contains(key));card.dataset.sourceKind=kind;const hint=document.createElement('div');hint.className='inv181-drop-hint';hint.textContent='松开以导入'+sourceLabel(kind);card.appendChild(hint);}
+    page.addEventListener('dragover',event=>{if(!isFileDrag(event))return;event.preventDefault();page.classList.add('inv181-files-drag');const target=event.target.closest('.inv15-source-card');cards.forEach(card=>card.classList.toggle('inv181-drop-target',card===target));event.dataTransfer.dropEffect=target?'copy':'none';clearTimeout(hideTimer);hideTimer=setTimeout(reset,1200);},true);
+    page.addEventListener('drop',event=>{if(!isFileDrag(event))return;event.preventDefault();event.stopImmediatePropagation();const card=event.target.closest('.inv15-source-card'),files=Array.from(event.dataTransfer?.files||[]);reset();if(!card)return toast('请将文件拖入对应表格卡片','err');if(files.length!==1||!/^.*\.(xlsx|xlsm)$/i.test(files[0]?.name||''))return toast('每次请拖入一张 XLSX 或 XLSM 表格','err');void saveSource(card.dataset.sourceKind,files[0]);},true);
+    window.addEventListener('dragend',reset);window.addEventListener('blur',reset);window.addEventListener('country-changed',reset);window.addEventListener('dragleave',event=>{if(!event.relatedTarget&&event.clientX===0&&event.clientY===0)reset();});
+  }
+
   function installPage() {
     const page = q('#page-inventory');
     if (!page) throw new Error('库存识别页面不存在');
@@ -1167,32 +1184,32 @@
 
       <section class="inv15-sources">
         <article class="inv15-source-card store">
-          <div class="inv15-source-head"><span>02</span><div><h3>店铺库存表</h3><p id="inv15StoreScope">当前店铺独立保存</p></div></div>
-          <label class="inv15-drop"><input id="inv15StoreFile" data-clear-installed="1" type="file" accept=".xlsx,.xlsm"><b>上传或更新表 2</b><span>保留为最终导出的原始模板</span></label>
+          <div class="inv15-source-head"><span>02</span><div><h3>店铺库存表</h3><p id="inv15StoreScope" hidden></p></div></div>
+          <label class="inv15-drop"><input id="inv15StoreFile" data-clear-installed="1" type="file" accept=".xlsx,.xlsm"></label>
           <button class="inv15-clear" type="button" data-inv15-clear="store">清除已保存表 2</button>
           <div id="inv15StoreStatus"></div>
           <details class="inv15-map"><summary>店铺基础列设置</summary><div class="inv15-map-grid" id="inv15StoreBaseMap"></div></details>
         </article>
 
         <article class="inv15-source-card mabang">
-          <div class="inv15-source-head"><span>01</span><div><h3>马帮库存表</h3><p>当前国家系统共享保存</p></div></div>
-          <label class="inv15-drop"><input id="inv15MabangFile" data-clear-installed="1" type="file" accept=".xlsx,.xlsm"><b>上传或更新表 1</b><span>读取普通 SKU、仓库和可用库存</span></label>
+          <div class="inv15-source-head"><span>01</span><div><h3>马帮库存表</h3></div></div>
+          <label class="inv15-drop"><input id="inv15MabangFile" data-clear-installed="1" type="file" accept=".xlsx,.xlsm"></label>
           <button class="inv15-clear" type="button" data-inv15-clear="mabang">清除已保存表 1</button>
           <div id="inv15MabangStatus"></div>
           <details class="inv15-map"><summary>马帮基础列设置</summary><div class="inv15-map-grid" id="inv15MabangBaseMap"></div></details>
         </article>
 
         <article class="inv15-source-card presale">
-          <div class="inv15-source-head"><span>03</span><div><h3>店铺预售表</h3><p>按店铺独立保存，以 SKU ID 关联</p></div></div>
-          <label class="inv15-drop"><input id="inv15PresaleFile" data-clear-installed="1" type="file" accept=".xlsx,.xlsm"><b>上传或更新表 3</b><span>读取预售 Enable 的 Yes / No</span></label>
+          <div class="inv15-source-head"><span>03</span><div><h3>店铺预售表</h3></div></div>
+          <label class="inv15-drop"><input id="inv15PresaleFile" data-clear-installed="1" type="file" accept=".xlsx,.xlsm"></label>
           <button class="inv15-clear" type="button" data-inv15-clear="presale">清除已保存表 3</button>
           <div id="inv15PresaleStatus"></div>
           <details class="inv15-map"><summary>预售关联列设置</summary><div class="inv15-map-grid" id="inv15PresaleBaseMap"></div></details>
         </article>
 
         <article class="inv15-source-card combo">
-          <div class="inv15-source-head"><span>04</span><div><h3>组合拆分表</h3><p>当前国家系统共享保存</p></div></div>
-          <label class="inv15-drop"><input id="inv15ComboFile" data-clear-installed="1" type="file" accept=".xlsx,.xlsm"><b>上传或更新表 4</b><span>自动读取组合及多个普通 SKU 组件</span></label>
+          <div class="inv15-source-head"><span>04</span><div><h3>组合拆分表</h3></div></div>
+          <label class="inv15-drop"><input id="inv15ComboFile" data-clear-installed="1" type="file" accept=".xlsx,.xlsm"></label>
           <button class="inv15-clear" type="button" data-inv15-clear="combo">清除已保存表 4</button>
           <div id="inv15ComboStatus"></div>
           <div class="inv15-combo-summary" id="inv15ComboSummary"></div>
@@ -1233,7 +1250,7 @@
           <input id="inv15Search" placeholder="搜索 SKU、店铺标题、马帮商品或原因">
           <select id="inv15Filter">
             <option value="actionable">需要处理</option><option value="unchanged">无需调整</option><option value="all">全部结果</option>
-            <option value="changed">只看将修改</option>
+            <option value="changed">只看将修改</option><option value="delist">需下架</option>
             <option value="flow1_original_warehouse">流程一 · 原仓有货</option>
             <option value="flow2_same_sku_other_warehouse">流程二 · 同 SKU 转仓</option>
             <option value="flow3_same_product_replacement">流程三 · 同款换 SKU</option>
@@ -1250,6 +1267,7 @@
       </section>`;
 
     const sourceGrid=q('.inv15-sources',page);for(const kind of ['mabang','store','presale','combo'])sourceGrid.appendChild(q('.inv15-source-card.'+kind,page));
+    installCardDropZones(page);
     populateStores();
     q('#inv15StoreScope').textContent = sourceScope('store');
     q('#inv15Threshold').value = String(config.threshold);
@@ -1265,7 +1283,7 @@
     q('#inv15Analyze').addEventListener('click', analyzeInventory);
     q('#inv18Blacklist').onclick=()=>showBlacklist();
     q('#inv18Reviewed').onchange=event=>{session.reviewed=event.target.checked;q('#inv15ExportWorkbook').disabled=!session.reviewed||!session.audit?.ok||session.reviewDrafts.size>0||session.results.some(r=>r.pendingRelist);};
-    q('#inv15ExportReview').addEventListener('click',async()=>{try{const blob=await buildInventoryWorkbook({reviewOnly:true});downloadBlob(blob,`${state.stores.find(x=>x.id===selectedStoreId())?.name||'店铺'}_库存预览_含待确认行_V18.0.xlsx`)}catch(error){toast(error.message,'err')}});
+    q('#inv15ExportReview').addEventListener('click',async()=>{try{const blob=await buildInventoryWorkbook({reviewOnly:true});downloadBlob(blob,`${state.stores.find(x=>x.id===selectedStoreId())?.name||'店铺'}_库存预览_含待确认行_V18.1.xlsx`)}catch(error){toast(error.message,'err')}});
     q('#inv15ExportManual').addEventListener('click', exportManualList);
     q('#inv15ExportWorkbook').addEventListener('click', exportInventoryWorkbook);
     q('#inv15StoreSelect').addEventListener('change', async (event) => {

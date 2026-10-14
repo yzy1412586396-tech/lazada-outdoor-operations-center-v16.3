@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '18.0';
+  const VERSION = '18.1';
   // V16.3 feature flag: the AI analysis template remains in the source and
   // bridge for a later re-enable, but is intentionally not exposed in the
   // current frontend. Do not delete the AI module; change this flag only in a
@@ -57,6 +57,7 @@
       if (strong.textContent.includes('当前')) strong.textContent = '版本更新记录';
     });
     const releases = [
+      {version:'V18.1',date:'2026-10-14',type:'库存预览优化',major:false,title:'需下架筛选、中文名称与拖入体验',items:['新增需下架统计、筛选与行标签，只包含本次最终状态改为inactive的商品；人工保存修改或黑名单冻结后同步更新。','商品原SKU下方显示马帮中文名称；发生SKU替换时仍对应原SKU名称，避免名称与编码混淆。','移除上传卡片的说明性批注和表头技术说明；整张卡片支持拖入文件，仅拖动时显示高亮接收提示，保持原排版。','保留人工核对、黑名单、预售提醒及原模板导出规则。']},
       {version:'V18.0',date:'2026-10-14',type:'库存流程重构',major:true,title:'上下架判断、人工二次核对与店铺黑名单',items:['纠正Status语义：active为上架，inactive为下架，彻底废弃活动中保护逻辑。','确认缺货、未预售且无替代SKU时改为inactive，指定仓库存保持原值；指定仓全0保留原状态，其他处理行非指定仓清零。','下架但有货或可替换的商品强提醒置顶，人工同意后才应用SKU、仓库和active；未同意整行保留。','新增可编辑表格二次核对，人工保存、重新选择上架处理及核对后导出；无变化商品默认隐藏。','黑名单按国家、店铺及SKU ID隔离，确认后整行冻结、免异常，支持弹窗查看和移出。','预售商品有货或有可换SKU时提示有货需关预售；有替换项则按规则替换，不自动修改预售表。','保留V17.8原生窗口调整方案；前端分页渲染、草稿保留，避免输入时整表刷新。']},
       {version:'V17.8',date:'2026-10-14',type:'维护更新',major:false,title:'原生窗口与有效操作结果',items:['Windows取消透明外壳，恢复原生可缩放、可最大化窗口及系统还原，移除脚本边缘缩放。','库存已符合目标的行归为无需调整，不进入流程一/二/三操作统计，保留原行。','新分析默认只看需要修改或人工处理的行；完整结果及原模板导出仍包含全部商品。','Windows10外层使用系统窗口边缘，页面内部圆角和全部既有库存规则保留。']},
       {version:'V17.7',date:'2026-10-14',type:'维护更新',major:false,title:'结果筛选显示与窗口缩放',items:['新分析默认显示全部结果，区分已分析数量与筛选数量，新增显示全部按钮。','扩大Windows边缘和角落可拖区域；缩放期间禁止误选文字，补全鼠标释放、取消和失焦清理。','最小窗口调整为900×560，保留圆角及同一国家仓库模板、特殊SKU和活动库存规则。']},

@@ -1,6 +1,6 @@
-# Lazada 户外运营中心 V18.0
+# Lazada 户外运营中心 V18.1
 
-当前最新版：**V18.0**（安装元数据 `18.0.0`）。本仓库名称中的 v16.3 是历史名称；旧版保留在 `archive/v16.3-transfer`，最新版位于 `codex/v18.0-inventory-review`。
+当前最新版：**V18.1**（安装元数据 `18.1.0`）。本仓库名称中的 v16.3 是历史名称；旧版保留在 `archive/v16.3-transfer`，最新版位于 `codex/v18.1-inventory-labels`。
 
 当前启用菲律宾、泰国两个国家，马来西亚入口暂时移除并保留既有数据。这是本地 Excel 运营工具：控价数据库、活动报名、全店 SpecialPrice 改价、库存识别、日报和费用管理。马来西亚历史实现与限制见 V17.0 更新说明。**没有接入公司 MCP 在线自动改价**，该功能已按用户要求暂停。
 
@@ -9,6 +9,8 @@
 到 [最新 Release](https://github.com/yzy1412586396-tech/lazada-outdoor-operations-center-v16.3/releases/latest) 下载 Windows x64 安装包。退出旧版再覆盖安装；保持原应用身份和数据目录，不清理原有业务数据。升级前建议在应用内导出备份。Windows 安装包未签名；尚未完成 Windows 10 实机安装、四角和拖动验收，因此附件标记为候选安装包。
 
 ## 功能和改动说明
+
+- [V18.1 预览优化](docs/UPDATE-18.1.md)：需下架筛选及原SKU对应的马帮中文名称。
 
 - [V18.0 验证记录](docs/VALIDATION-18.0.md)：实际操作、四表导出、性能与平台验证边界。
 - [V18.0 上下架、人工核对与黑名单](docs/UPDATE-18.0.md)：纠正active/inactive语义、缺货下架、下架有货人工确认、可编辑预览、按国家店铺SKU ID冻结和有货需关预售。
