@@ -723,7 +723,7 @@
         threshold: config.threshold,
         overflowValue: config.overflowValue,excludedSkus:config.excludedSkus,relatedSkus:config.relatedSkus,
       });
-      session.context=scope;session.results = analysis.results;
+      session.context=scope;session.results = analysis.results;session.filter='all';session.query='';q('#inv15Filter').value='all';q('#inv15Search').value='';
       session.audit = analysis.audit;
       session.visibleLimit = 100;session.page=1;
       renderResults();
@@ -859,7 +859,7 @@
     const filtered = filteredResults();
     const pages=Math.max(1,Math.ceil(filtered.length/100));session.page=Math.min(session.page||1,pages);
     const visible = filtered.slice((session.page-1)*100,session.page*100);
-    q('#inv15ResultCount').textContent = `当前 ${filtered.length} / 全部 ${session.results.length}`;
+    q('#inv15ResultCount').textContent = `已分析 ${session.results.length} 条 · 筛选结果 ${filtered.length} 条`;
     q('#inv15ResultList').innerHTML = visible.length ? visible.map((result) => resultRowHtml(result, warehouses)).join('') : '<div class="inv15-empty">当前筛选没有结果。</div>';
     q('#inv15More').innerHTML=`<span>第 ${session.page}/${pages} 页 · 每页100条 · 导出包含全部结果</span><button class="btn light" id="inv15Prev" ${session.page===1?'disabled':''}>上一页</button><button class="btn light" id="inv15Next" ${session.page===pages?'disabled':''}>下一页</button>`;
     q('#inv15Prev').onclick=()=>{session.page--;renderResults()};q('#inv15Next').onclick=()=>{session.page++;renderResults()};
@@ -1215,7 +1215,7 @@
             <option value="activity">活动中</option><option value="processed">已处理 / 清零完成</option>
             <option value="combo">组合 SKU</option>
           </select>
-          <span id="inv15ResultCount">尚未分析</span>
+          <div class="inv15-filter-status"><span id="inv15ResultCount">尚未分析</span><button type="button" class="btn light sm" id="inv15ShowAll">显示全部</button></div>
         </div>
         <div id="inv15ResultList" class="inv15-result-list"><div class="inv15-empty">四张表就绪后，点击“执行库存识别”。</div></div>
         <div id="inv15More" class="inv15-more"></div>
@@ -1246,6 +1246,7 @@
     });
     q('#inv15Threshold').addEventListener('change', (event) => { config.threshold = Math.max(0, engine.number(event.target.value)); saveConfig(); clearAnalysis(); });
     q('#inv15Overflow').addEventListener('change', (event) => { config.overflowValue = Math.max(1, engine.number(event.target.value)); saveConfig(); clearAnalysis(); });
+    q('#inv15ShowAll').onclick=()=>{session.filter='all';session.query='';session.page=1;q('#inv15Filter').value='all';q('#inv15Search').value='';renderResults();};
     q('#inv15Filter').addEventListener('change', (event) => { session.filter = event.target.value; session.visibleLimit = 100; renderResults(); });
     let searchTimer;
     q('#inv15Search').addEventListener('input', (event) => {

@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '17.6';
+  const VERSION = '17.7';
   // V16.3 feature flag: the AI analysis template remains in the source and
   // bridge for a later re-enable, but is intentionally not exposed in the
   // current frontend. Do not delete the AI module; change this flag only in a
@@ -57,6 +57,7 @@
       if (strong.textContent.includes('当前')) strong.textContent = '版本更新记录';
     });
     const releases = [
+      {version:'V17.7',date:'2026-10-14',type:'维护更新',major:false,title:'结果筛选显示与窗口缩放',items:['新分析默认显示全部结果，区分已分析数量与筛选数量，新增显示全部按钮。','扩大Windows边缘和角落可拖区域；缩放期间禁止误选文字，补全鼠标释放、取消和失焦清理。','最小窗口调整为900×560，保留圆角及同一国家仓库模板、特殊SKU和活动库存规则。']},
       {version:'V17.6',date:'2026-10-13',type:'维护更新',major:false,title:'共用仓库模板与特殊SKU规则',items:['菲律宾与泰国各自共用仓库对应模板，店铺间按表头自动对应，两个国家互不干扰。','活动中已预售保持原样不报备；未预售缺货优先同款、其次显式关联SKU替换，无可用替换才进入人工处理。','SKU格式问题改为特殊提示，不进入异常及人工名单。','仓库选择与关键字输入合并为单行；页面移除多余流程和实现说明。','新增可收起的特殊SKU模块：完全/包含匹配跳过识别、关联SKU管理；规则按国家保存，关联目标验证实际单仓有货。']},
       {version:'V17.5',date:'2026-10-13',type:'维护更新',major:false,title:'国家切换流畅性与仓库关键字编辑',items:['切换菲律宾 / 泰国保留当前模块，不再返回首页。','只刷新当前可见业务表格；国家状态和已解析库存来源分开缓存，避免重复迁移和解析。','切换立即清除旧国家的分析结果，隐藏库存模块按需恢复，保持国家及店铺隔离。','仓库关键字支持清空、直接编辑和完整仓库列表重新选择；配置保留空值，输入保存合并写入。']},
       {version:'V17.4',date:'2026-10-13',type:'维护更新',major:false,title:'活动库存保护与清零规则',items:['Status=active整行保护；缺货或非指定仓有库存时提示活动中，active保护优先。','未预售且库存不足、指定仓已为0视为已处理；缺货清零完成不再报备，移除未上架自动标签。','重复替换SKU自动分配未占用的大写S1/S2等后缀；不冲突时保留原后缀。','非active行非指定仓强制写数字0，自动有货行单个指定仓写9999，其他仓写0；组合同仓及国家店铺隔离保留。']},

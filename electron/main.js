@@ -12,8 +12,8 @@ const { registerAutomationFolderHandlers } = require('./automation-folders');
 const { NorthstarReadOnlyServer } = require('./northstar-server');
 
 const APP_NAME = 'Lazada户外运营中心';
-const APP_VERSION = '17.6.0';
-const DISPLAY_VERSION = '17.6';
+const APP_VERSION = '17.7.0';
+const DISPLAY_VERSION = '17.7';
 const TRANSPARENT_DRAG_ICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 const isSmokeTest = process.argv.includes('--smoke-test');
 const isRealInventoryTest = process.argv.includes('--real-inventory-test');
@@ -1127,8 +1127,8 @@ function createWindow() {
     height: bounds.height,
     x: bounds.x,
     y: bounds.y,
-    minWidth: windowsSurface ? Math.min(1100, display.workArea.width) : 1100,
-    minHeight: windowsSurface ? Math.min(700, display.workArea.height) : 700,
+    minWidth: windowsSurface ? Math.min(900, display.workArea.width) : 900,
+    minHeight: windowsSurface ? Math.min(560, display.workArea.height) : 560,
     show: false,
     autoHideMenuBar: true,
     frame: !windowsSurface && process.platform === 'darwin',

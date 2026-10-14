@@ -5,7 +5,7 @@
   if (root) root.InventoryEngineV15 = Object.freeze(api);
 })(typeof window !== 'undefined' ? window : globalThis, () => {
   'use strict';
-  const VERSION = '17.6';
+  const VERSION = '17.7';
   const TAGS = Object.freeze({PRESALE:'预售',ANOMALY:'异常',UNLISTED:'未上架',OPENED:'已开预售',ACTIVITY:'活动中',SPECIAL:'特殊提示'});
   const clean = value => String(value ?? '').trim();
   const normalizeRawSku = value => clean(value).replace(/\s+/g,'').toUpperCase();
@@ -134,7 +134,7 @@
       else if(info.kind==='invalid'){r.preserveRow=true;mark(TAGS.SPECIAL,'special_invalid_sku','SKU格式特殊，保持原样');}
       else if (info.kind!=='invalid'&&r.presale==='no'&&mappedZero&&(low||(info.kind==='ordinary'&&!exact))&&(!r.activityProtected||allZero)) mark(null,'already_processed','库存不足、未预售，指定仓库存均为0，已处理过，无需操作');
       else if (r.activityProtected) {
-        // V17.6 supersedes the former unconditional active freeze. Only a
+        // V17.7 supersedes the former unconditional active freeze. Only a
         // confirmed shortage, No presale and no stocked replacement needs review.
         if(r.presale==='yes')mark(null,'activity_presale_unchanged','活动中已开预售，保持原样');
         else if(low&&r.presale==='no'){

@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-const APP_VERSION = '17.6.0';
-const DISPLAY_VERSION = '17.6';
+const APP_VERSION = '17.7.0';
+const DISPLAY_VERSION = '17.7';
 const usesWindowsSurface = process.platform === 'win32' || process.argv.includes('--windows-surface');
 let databaseReady = false;
 let lastStorage = new Map();
@@ -293,6 +293,7 @@ function installWindowChrome() {
     const stop = () => {
       if (!activeHandle) return;
       activeHandle = null;
+      delete document.documentElement.dataset.windowResizing;
       ipcRenderer.send('window:resize-stop');
     };
     for (const edge of ['n','s','e','w','ne','nw','se','sw']) {
@@ -301,16 +302,24 @@ function installWindowChrome() {
       handle.addEventListener('pointerdown', (event) => {
         if (event.button !== 0) return;
         event.preventDefault();
-        handle.setPointerCapture(event.pointerId);
         activeHandle = handle;
-        void ipcRenderer.invoke('window:resize-start', edge);
+        try { handle.setPointerCapture(event.pointerId); } catch { /* Document release listeners remain active. */ }
+        document.documentElement.dataset.windowResizing = 'true';
+        void ipcRenderer.invoke('window:resize-start', edge).then(result=>{if(!result.ok)stop();}).catch(stop);
       });
       handle.addEventListener('pointerup', stop);
       handle.addEventListener('pointercancel', stop);
-      handle.addEventListener('lostpointercapture', stop);
+      // Moving the HWND can drop DOM pointer capture. That alone does not mean
+      // the mouse button was released, so continue until release/cancel/blur.
+      handle.addEventListener('lostpointercapture', () => {});
       document.body.appendChild(handle);
     }
+    document.addEventListener('pointerup', stop, true);
+    document.addEventListener('mouseup', stop, true);
+    document.addEventListener('pointermove', event => { if(activeHandle&&!(event.buttons&1))stop(); }, true);
+    document.addEventListener('keydown', event => { if(event.key==='Escape')stop(); }, true);
     window.addEventListener('blur', stop);
+    window.addEventListener('pagehide', stop);
     const updateState = (state) => {
       document.documentElement.dataset.windowMaximized = String(!!state.maximized);
       chrome.querySelector('[data-window-action="maximize"]').setAttribute('aria-label', state.maximized ? '还原' : '最大化');
