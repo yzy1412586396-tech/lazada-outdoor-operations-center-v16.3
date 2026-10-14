@@ -97,6 +97,7 @@
     Object.assign(r,next);return r;
   }
   function decideRelist(r,approved,warehouses){
+    if(r.blacklisted||r.frozen)throw Error('冻结商品不能上架');
     if(!r.pendingRelist||!r.proposal)throw Error('此商品没有待确认上架建议');
     r.pendingRelist=false;r.relistDecision=approved?'approved':'kept';r.reasons=r.reasons.filter(x=>!x.startsWith('下架商品有货或有可换SKU'));
     r.tags=r.tags.filter(t=>t!=='下架商品有货');
