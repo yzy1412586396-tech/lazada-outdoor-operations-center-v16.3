@@ -8,4 +8,6 @@
 - 库存单元测试通过；1万条预览100个节点，约8ms。
 - 900×560小窗截图亲自检查。
 
-Windows候选安装包未签名，SHA-256：`434a1de6a2171a0b56d40623ebe5bdf1f1fc5e98997fc9c0b71ea0c80edc9773`。
+Windows候选安装包未签名，SHA-256：`b75ac1a361022d9c1807f64be1b69492dbdec8f1c4518568c57ca63dbb2a4ebf`。
+
+Windows包提取代码的八方向测试再次通过，Mac/Windows源文件逐字节一致。Mac已部署，锁屏暂无法重新打开实际应用。

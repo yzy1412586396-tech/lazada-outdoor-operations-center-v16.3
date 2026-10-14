@@ -897,7 +897,7 @@
     ].map(quoteCsv).join(','));
     const blob = new Blob([`\ufeff${headers.map(quoteCsv).join(',')}\r\n${lines.join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
     const storeName = state?.stores?.find((store) => store.id === selectedStoreId())?.name || '店铺';
-    downloadBlob(blob, `${storeName}_V17.6库存人工处理名单_${new Date().toISOString().slice(0, 10)}.csv`);
+    downloadBlob(blob, `${storeName}_V17.7库存人工处理名单_${new Date().toISOString().slice(0, 10)}.csv`);
   }
 
   async function prepareInventoryStyles(workbook) {
@@ -1018,7 +1018,7 @@
     if (!definition) throw new Error('导出时找不到原店铺工作表');
     const sheet = await getSheet(workbook, definition);
     for (const result of session.results) {
-      // V17.6: protected and already-completed rows retain original XML, including cell types.
+      // V17.7: protected and already-completed rows retain original XML, including cell types.
       if(result.activityProtected||result.preserveRow||(result.flow==='already_processed'&&!result.changed))continue;
       setInventoryTextCell(workbook, sheet, result.row, Number(config.storeSku), result.finalSku);
       if (config.storeStatus) setInventoryTextCell(workbook, sheet, result.row, Number(config.storeStatus), result.status);
@@ -1076,7 +1076,7 @@
     try {
       const blob = await buildInventoryWorkbook();
       const storeName = state?.stores?.find((store) => store.id === selectedStoreId())?.name || '店铺';
-      const filename = `${storeName}_V17.6库存更新_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const filename = `${storeName}_V17.7库存更新_${new Date().toISOString().slice(0, 10)}.xlsx`;
       downloadBlob(blob, filename);
       toast(`已生成 ${filename}；原模板结构保留，成品二次识别通过`, 'ok');
     } catch (error) {
@@ -1235,7 +1235,7 @@
     q('#inv15AddExcluded').onclick=()=>addSpecialRule('excluded');q('#inv15AddRelated').onclick=()=>addSpecialRule('related');
     q('#inv15WarehousePicker').onclick=event=>{const button=event.target.closest('[data-inv15-pick-value]');if(!button)return;const row=qa('.inv15-warehouse-row[data-warehouse-id]').find(r=>r.dataset.warehouseId===q('#inv15WarehousePicker').dataset.warehouseId);const input=row?.querySelector('[data-inv15-mabang-value]');if(input){input.value=button.dataset.inv15PickValue;updateWarehouse(input);}q('#inv15WarehousePicker').hidePopover();};
     q('#inv15Analyze').addEventListener('click', analyzeInventory);
-    q('#inv15ExportReview').addEventListener('click',async()=>{try{const blob=await buildInventoryWorkbook({reviewOnly:true});downloadBlob(blob,`${state.stores.find(x=>x.id===selectedStoreId())?.name||'店铺'}_库存预览_含待确认行_V17.6.xlsx`)}catch(error){toast(error.message,'err')}});
+    q('#inv15ExportReview').addEventListener('click',async()=>{try{const blob=await buildInventoryWorkbook({reviewOnly:true});downloadBlob(blob,`${state.stores.find(x=>x.id===selectedStoreId())?.name||'店铺'}_库存预览_含待确认行_V17.7.xlsx`)}catch(error){toast(error.message,'err')}});
     q('#inv15ExportManual').addEventListener('click', exportManualList);
     q('#inv15ExportWorkbook').addEventListener('click', exportInventoryWorkbook);
     q('#inv15StoreSelect').addEventListener('change', async (event) => {
