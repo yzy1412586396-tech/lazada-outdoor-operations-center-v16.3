@@ -1,7 +1,7 @@
 const { app, BrowserWindow, Menu, dialog, shell, session, ipcMain, safeStorage, clipboard, nativeImage, screen } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { installWindowsSurface, fitBoundsToWorkArea } = require('./window-surface');
+const { fitBoundsToWorkArea } = require('./window-surface');
 const { OperationsDatabase } = require('./database');
 const { ContextBuilder } = require('./services/context-builder');
 const { CredentialStore } = require('./services/credential-store');
@@ -12,8 +12,8 @@ const { registerAutomationFolderHandlers } = require('./automation-folders');
 const { NorthstarReadOnlyServer } = require('./northstar-server');
 
 const APP_NAME = 'Lazada户外运营中心';
-const APP_VERSION = '17.7.0';
-const DISPLAY_VERSION = '17.7';
+const APP_VERSION = '18.0.0';
+const DISPLAY_VERSION = '18.0';
 const TRANSPARENT_DRAG_ICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 const isSmokeTest = process.argv.includes('--smoke-test');
 const isRealInventoryTest = process.argv.includes('--real-inventory-test');
@@ -87,8 +87,8 @@ function readWindowState() {
 
 function writeWindowState(win) {
   if (!win || win.isDestroyed() || isSmokeTest) return;
-  const maximized = win.windowsSurface ? win.windowsSurface.isMaximized() : win.isMaximized();
-  const bounds = win.windowsSurface ? win.windowsSurface.getNormalBounds() : (maximized ? win.getNormalBounds() : win.getBounds());
+  const maximized = win.isMaximized();
+  const bounds = maximized ? win.getNormalBounds() : win.getBounds();
   const payload = { ...bounds, maximized };
   try {
     fs.mkdirSync(app.getPath('userData'), { recursive: true });
@@ -458,16 +458,13 @@ function registerWindowHandlers() {
   ipcMain.handle('window:minimize', (event) => { getOwnedWindow(event).minimize(); return { ok: true }; });
   ipcMain.handle('window:maximize-toggle', (event) => {
     const win = getOwnedWindow(event);
-    if (win.windowsSurface) return { ok: true, maximized: win.windowsSurface.toggleMaximize() };
     if (win.isMaximized()) win.unmaximize(); else win.maximize();
     return { ok: true, maximized: win.isMaximized() };
   });
   ipcMain.handle('window:close', (event) => { getOwnedWindow(event).close(); return { ok: true }; });
-  ipcMain.handle('window:resize-start', (event, edge) => ({ ok: getOwnedWindow(event).windowsSurface?.startResize(edge) || false }));
-  ipcMain.on('window:resize-stop', (event) => { getOwnedWindow(event).windowsSurface?.stopResize(); });
   ipcMain.handle('window:state', (event) => {
     const win = getOwnedWindow(event);
-    return { maximized: win.windowsSurface ? win.windowsSurface.isMaximized() : win.isMaximized() };
+    return { maximized: win.isMaximized() };
   });
   ipcMain.on('window:surface-ready', (event) => {
     const win = getOwnedWindow(event);
@@ -1134,11 +1131,14 @@ function createWindow() {
     frame: !windowsSurface && process.platform === 'darwin',
     titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'default',
     roundedCorners: true,
-    transparent: windowsSurface,
-    resizable: !windowsSurface,
-    maximizable: !windowsSurface,
-    hasShadow: !windowsSurface,
-    backgroundColor: windowsSurface ? '#00000000' : '#F1F5F9',
+    // V18.0: supported native window sizing. Transparent/non-resizable Windows
+    // windows cannot be made reliable by a renderer polling cursor coordinates.
+    transparent: false,
+    resizable: true,
+    maximizable: true,
+    thickFrame: true,
+    hasShadow: true,
+    backgroundColor: '#F1F5F9',
     icon: path.join(__dirname, '..', 'app', 'app-icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -1153,7 +1153,8 @@ function createWindow() {
   });
 
   if (process.platform === 'darwin') win.setWindowButtonVisibility(false);
-  if (windowsSurface) win.windowsSurface = installWindowsSurface(win, screen);
+  const publishWindowState=()=>{if(!win.isDestroyed())win.webContents.send('window:surface-state',{maximized:win.isMaximized()});};
+  win.on('maximize',publishWindowState);win.on('unmaximize',publishWindowState);win.on('restore',publishWindowState);
   mainWindow = win;
   win.webContents.on('render-process-gone', (_event, details) => {
     console.error('RENDER_PROCESS_GONE:', JSON.stringify(details));
@@ -1162,7 +1163,7 @@ function createWindow() {
     console.error('DID_FAIL_LOAD:', JSON.stringify({ code, description, url, isMainFrame }));
   });
   if (state.maximized && !isSmokeTest && !isUiTest) {
-    if (win.windowsSurface) win.windowsSurface.toggleMaximize(); else win.maximize();
+    win.maximize();
   }
 
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -1191,7 +1192,7 @@ function createWindow() {
     win.once('ready-to-show', () => win.show());
   } else {
     win.once('ready-to-show', () => {
-      if (!win.windowsSurface) win.show();
+      if (!windowsSurface) win.show();
       else { win.readyForSurface = true; if (win.surfaceReady) win.show(); }
     });
   }

@@ -72,20 +72,10 @@
 :root.desktop-app[data-theme][data-effects] input[type=date],:root.desktop-app[data-theme][data-effects] input[type=month]{min-width:0!important;max-width:100%!important;width:100%!important}
 @media(max-width:850px){:root.desktop-app[data-theme][data-effects] .expense-grid>div:has(>.expense-switch){grid-column:1/-1}}
 
-/* Only Windows outer corner pixels carry alpha. All content surfaces are opaque. */
-:root.desktop-app[data-theme][data-effects][data-desktop-platform="win32"]{background:transparent!important;overflow:hidden}
-:root.desktop-app[data-theme][data-effects][data-desktop-platform="win32"] body{position:fixed;inset:0;width:100%;height:100%;min-height:0;margin:0;padding:0;overflow:hidden;clip-path:none;background:transparent!important}
-:root.desktop-app[data-theme][data-effects][data-desktop-platform="win32"] #desktopWindowSurface{position:fixed;inset:0;width:100%;height:100%;overflow:hidden;border-radius:14px;clip-path:inset(0 round 14px);background:var(--bg);contain:paint;isolation:isolate}
-:root.desktop-app[data-desktop-platform="win32"] .window-resize-handle{position:fixed;z-index:100000;-webkit-app-region:no-drag;touch-action:none}
-.window-resize-handle.edge-n{top:0;left:24px;right:24px;height:10px;cursor:n-resize}
-.window-resize-handle.edge-s{bottom:0;left:24px;right:24px;height:10px;cursor:s-resize}
-.window-resize-handle.edge-w{left:0;top:24px;bottom:24px;width:10px;cursor:w-resize}
-.window-resize-handle.edge-e{right:0;top:24px;bottom:24px;width:10px;cursor:e-resize}
-.window-resize-handle.edge-nw{top:0;left:0;width:24px;height:24px;cursor:nw-resize}
-.window-resize-handle.edge-ne{top:0;right:0;width:24px;height:24px;cursor:ne-resize}
-.window-resize-handle.edge-sw{bottom:0;left:0;width:24px;height:24px;cursor:sw-resize}
-.window-resize-handle.edge-se{bottom:0;right:0;width:24px;height:24px;cursor:se-resize}
-:root[data-window-maximized="true"] .window-resize-handle{display:none}
+/* V17.8: native opaque Windows sizing; interior app corners remain rounded. */
+:root.desktop-app[data-theme][data-effects][data-desktop-platform="win32"]{background:var(--bg)!important;overflow:hidden}
+:root.desktop-app[data-theme][data-effects][data-desktop-platform="win32"] body{position:fixed;inset:0;width:100%;height:100%;min-height:0;margin:0;padding:0;overflow:hidden;background:var(--bg)!important}
+:root.desktop-app[data-theme][data-effects][data-desktop-platform="win32"] #desktopWindowSurface{position:fixed;inset:0;width:100%;height:100%;overflow:hidden;border-radius:0;clip-path:none;background:var(--bg);contain:paint;isolation:isolate}
 :root.desktop-app[data-theme][data-effects] .brand-mark{background:#eef2f7!important;box-shadow:none!important}
 
 /* V17.1：预览风险颜色在所有主题下固定高对比，不进入 Excel 输出。 */
@@ -104,4 +94,9 @@ html.desktop-app #activityTable tr.activity-ratio-warning .activity-ratio-cell s
 html.desktop-app #activityTable tr.activity-ratio-warning .activity-ratio-note{color:#76152b!important}
 html.desktop-app .activity-preset-trigger{font-weight:700}
 
-:root[data-window-resizing="true"] *{user-select:none!important;-webkit-user-select:none!important}
+
+/* V18 review alerts override generic table/hover theme colors. */
+:root.desktop-app[data-theme][data-effects] .inv18-review-table tbody tr.inv18-urgent td{background:var(--dangerBg)!important;border-top:1px solid var(--danger)!important;border-bottom:1px solid var(--danger)!important}
+:root.desktop-app[data-theme][data-effects] .inv18-review-table tbody tr.inv18-urgent td:first-child{border-left:4px solid var(--danger)!important}
+:root.desktop-app[data-theme][data-effects] .inv18-review-table tbody tr.inv18-urgent .chip{background:var(--danger)!important;color:white!important}
+:root.desktop-app[data-theme][data-effects] .inv18-review-table td{white-space:normal;overflow-wrap:anywhere}

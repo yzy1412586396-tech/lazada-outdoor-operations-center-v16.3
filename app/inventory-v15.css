@@ -43,3 +43,20 @@
 :root.desktop-app[data-theme] .inv15-warehouse-row{background:var(--surface2)!important;box-shadow:none!important}
 
 .inv15-filter-status{grid-column:1/-1;display:flex;align-items:center;gap:12px;color:var(--muted);font-size:11px}.inv15-filter-status button{margin-left:auto}
+
+/* V18 bounded editable review. Horizontal scroll keeps columns usable at 900px. */
+.inv18-command-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.inv15-result-list:has(.inv18-review-table){display:block;overflow:auto;border:1px solid var(--line);border-radius:16px;max-height:740px}
+.inv18-review-table{border-collapse:separate;border-spacing:0;width:100%;min-width:1140px;font-size:12px;table-layout:fixed}
+.inv18-review-table th{position:sticky;top:0;z-index:1;background:var(--surface2,#f1f5ff);text-align:left;padding:14px 12px;color:var(--muted);border-bottom:1px solid var(--line)}
+.inv18-review-table th:nth-child(1){width:24%}.inv18-review-table th:nth-child(2){width:22%}.inv18-review-table th:nth-child(3){width:24%}.inv18-review-table th:nth-child(4){width:25%}.inv18-review-table th:last-child{width:5%}
+.inv18-review-table tr.inv15-result{display:table-row;border:0;border-radius:0;box-shadow:none;background:var(--surface,#fff)}
+.inv18-review-table td{padding:16px 12px;vertical-align:top;border-bottom:1px solid var(--line);border-right:1px solid var(--line)}
+.inv18-review-table tr.inv18-urgent{background:color-mix(in srgb,#ef4444 14%,var(--surface,#fff))!important}.inv18-urgent td:first-child{border-left:5px solid #e11d48}.inv18-urgent strong{color:#be123c}
+.inv18-review-table strong{display:block;margin:6px 0;overflow-wrap:anywhere}.inv18-review-table small{display:block;color:var(--muted);line-height:1.6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.inv18-review-table input,.inv18-review-table select{width:100%;min-width:0;margin:4px 0;padding:9px;border:1px solid var(--line);border-radius:9px;background:var(--surface2,#f8faff);color:var(--text);font:inherit}
+.inv18-review-table input:disabled,.inv18-review-table select:disabled{opacity:.7;cursor:default}.inv18-stocks{display:grid;gap:6px}.inv18-stocks label{display:grid;grid-template-columns:minmax(0,1fr) 80px;gap:8px;align-items:center}.inv18-stocks span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.inv18-mini-label,.inv18-source-row{font-size:11px;color:var(--muted)}.inv18-reasons p{margin:0 0 8px;line-height:1.7}.inv18-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.inv18-freeze{text-align:center}
+.inv18-review-confirm{display:inline-flex;gap:8px;align-items:center;margin:12px 18px 18px 0;cursor:pointer}.inv18-review-confirm input{width:16px;height:16px}#inv18ReviewHint{font-size:12px;color:var(--muted)}
+.inv18-dialog{max-width:760px;width:calc(100vw - 64px);max-height:80vh;overflow:auto;padding:24px;border:1px solid var(--line);border-radius:20px;background:var(--surface,#fff);color:var(--text);box-shadow:0 20px 80px #0005}.inv18-dialog::backdrop{background:#0f172a80}.inv18-dialog header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px}.inv18-dialog h3{margin:0}.inv18-dialog label{display:grid;gap:8px}.inv18-dialog select{padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface2);color:var(--text)}.inv18-blacklist-rows>div{display:flex;align-items:center;gap:16px;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--line)}.inv18-blacklist-rows small{display:block;color:var(--muted)}
+
+.inv18-review-table td:last-child{position:sticky;right:0;z-index:2;background:var(--surface,#fff);border-left:1px solid var(--line)}.inv18-review-table th:last-child{right:0;z-index:3}.inv18-review-table .inv18-urgent td{background:color-mix(in srgb,#ef4444 14%,var(--surface,#fff))!important}.inv18-other-stock{margin-top:10px}.inv18-other-stock summary{font-size:11px;color:var(--muted);cursor:pointer;padding:7px 0}.inv18-other-stock[open] .inv18-stocks{padding-top:8px}.inv18-review-table td[data-dirty]{outline:1px solid var(--accent)}

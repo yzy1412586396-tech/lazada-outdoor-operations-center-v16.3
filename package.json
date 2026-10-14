@@ -1,6 +1,6 @@
 {
   "name": "lazada-outdoor-operations-center",
-  "version": "17.7.0",
+  "version": "18.0.0",
   "description": "Lazada户外运营中心桌面版",
   "main": "electron/main.js",
   "author": {
@@ -10,7 +10,8 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "dist:win": "node scripts/build-windows.cjs"
+    "dist:win": "node scripts/build-windows.cjs",
+    "test:inventory": "node tests/inventory-v180-unit.cjs"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
@@ -41,7 +42,7 @@
         }
       ],
       "signAndEditExecutable": false,
-      "artifactName": "Lazada-Operations-Center-17.7-Setup-x64.${ext}",
+      "artifactName": "Lazada-Operations-Center-18.0-Setup-x64.${ext}",
       "icon": "build/icon.ico"
     },
     "nsis": {

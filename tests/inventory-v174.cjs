@@ -1,2 +1,2 @@
-// V17.6 supersedes the prior active inventory policy.
-require('./inventory-v176.cjs');
+// Current inventory entry point; V18 corrects active/inactive semantics.
+require('./inventory-v180.cjs');

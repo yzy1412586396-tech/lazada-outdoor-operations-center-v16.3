@@ -1,0 +1,12 @@
+const {app}=require('electron'),fs=require('fs'),path=require('path'),assert=require('node:assert/strict');
+const root=process.env.LAZADA_TEST_APP_ROOT||path.resolve(__dirname,'..'),out=process.env.LAZADA_WINDOW_OUTPUT||'/tmp/lazada-v178-window';fs.mkdirSync(out,{recursive:true});app.setPath('appData',path.join(out,'profile'));process.argv.push('--playwright-test','--surface-renderer-test');
+const main=fs.readFileSync(path.join(root,'electron/main.js'),'utf8'),preload=fs.readFileSync(path.join(root,'electron/preload.js'),'utf8');for(const option of ['transparent: false','resizable: true','maximizable: true','thickFrame: true'])assert(main.includes(option),option);assert(!main.includes('installWindowsSurface'));assert(!preload.includes('window:resize-start'));
+const sleep=ms=>new Promise(r=>setTimeout(r,ms)),timer=setTimeout(()=>app.exit(1),90000);
+app.on('browser-window-created',(_,win)=>win.webContents.once('did-finish-load',async()=>{try{
+ await sleep(2200);assert(win.isResizable());assert(win.isMaximizable());assert(!win.windowsSurface);
+ const state=await win.webContents.executeJavaScript(`({handles:document.querySelectorAll('.window-resize-handle').length,surface:!!document.querySelector('#desktopWindowSurface'),background:getComputedStyle(document.body).backgroundColor})`);assert.equal(state.handles,0);assert(state.surface);assert(!state.background.includes('rgba'));
+ win.setBounds({x:45,y:65,width:1040,height:660});await sleep(250);const original=win.getBounds();
+ await win.webContents.executeJavaScript("desktopApp.window.maximizeToggle()");await sleep(400);assert(win.isMaximized(),'native maximize');await win.webContents.executeJavaScript("desktopApp.window.maximizeToggle()");await sleep(400);assert(!win.isMaximized(),'native unmaximize');assert.deepEqual(win.getBounds(),original,'native normal bounds restored');
+ win.setSize(900,560);await win.webContents.executeJavaScript("go('inventory')");await sleep(300);fs.writeFileSync(path.join(out,'minimum-window.png'),(await win.webContents.capturePage()).toPNG());
+ fs.writeFileSync(path.join(out,'report.json'),JSON.stringify({ok:true,nativeResizable:win.isResizable(),nativeMaximizable:win.isMaximizable(),normalBoundsRestored:true,rendererState:state,windows10NativeTested:process.platform==='win32',host:process.platform},null,2));console.log('WINDOW_NATIVE_V178_OK');clearTimeout(timer);app.exit(0);
+ }catch(e){console.error(e);clearTimeout(timer);app.exit(1)}}));require(path.join(root,'electron/main.js'));

@@ -14,9 +14,10 @@
     presale: null,
     context: null,
     results: [],
+    reviewDrafts:new Map(),reviewed:false,
     audit: null,
     storeId: '',
-    filter: 'all',
+    filter: 'actionable',
     query: '',
     visibleLimit: 100,
     restoring: false,
@@ -109,6 +110,30 @@
       : `inventory-v15:${country()}:shared:${kind}`;
   }
 
+  // No shared-config fallback: SKU ID freezes belong to exactly one country/store.
+  const blacklistKey=(storeId=selectedStoreId())=>`lazadaInventoryBlacklistV18:${country()}:${storeId}`;
+  function readBlacklist(storeId){try{const rows=JSON.parse(localStorage.getItem(blacklistKey(storeId))||'[]');return Array.isArray(rows)?rows.filter(x=>clean(x.skuId)):[];}catch{return[];}}
+  function writeBlacklist(rows,storeId){localStorage.setItem(blacklistKey(storeId),JSON.stringify(rows));window.desktopApp?.database?.flush();}
+  function resetReview(){session.reviewRevision=(session.reviewRevision||0)+1;session.reviewed=false;if(q('#inv18Reviewed'))q('#inv18Reviewed').checked=false;}
+  function refreshAudit(){resetReview();session.audit=engine.auditResults(session.results,stockWarehouses());renderResults();}
+  function freezeBlacklisted(r){Object.assign(r,{blacklisted:true,frozen:true,preserveRow:true,pendingRelist:false,proposal:null,needsClosePresale:false,finalSku:r.originalSku,finalStatus:r.status,finalStocks:{...r.originalStocks},tags:[],reasons:['店铺黑名单冻结，原行保留'],flow:'blacklisted'});engine.recalculate(r,stockWarehouses());}
+  function blacklistRow(r){
+    if(!r.skuId)return toast('SKU ID缺失，不能加入黑名单','err');
+    const scope=contextKey();openInventoryDialog('加入店铺黑名单',`<p>确认冻结 SKU ID <b>${escapeHtml(r.skuId)}</b>？</p><p>${escapeHtml(r.originalSku)} · ${escapeHtml(r.title)}</p><p>以后当前店铺识别到此ID，整行保留。</p><button class="btn primary" data-confirm-blacklist>确认加入</button>`);
+    q('[data-confirm-blacklist]').onclick=()=>{if(scope!==contextKey())return closeInventoryDialog();const rows=readBlacklist();if(!rows.some(x=>x.skuId===r.skuId)){rows.push({skuId:r.skuId,sku:r.originalSku,title:r.title,createdAt:new Date().toISOString()});writeBlacklist(rows);}for(const item of session.results)if(item.skuId===r.skuId){freezeBlacklisted(item);session.reviewDrafts.delete(item.row);}closeInventoryDialog();refreshAudit();};
+  }
+  function closeInventoryDialog(){const dialog=q('#inv18Dialog');if(dialog?.open)dialog.close();dialog?.remove();}
+  function openInventoryDialog(title,html){closeInventoryDialog();const dialog=document.createElement('dialog');dialog.id='inv18Dialog';dialog.className='inv18-dialog';dialog.innerHTML=`<header><h3>${escapeHtml(title)}</h3><button class="btn light sm" data-close-inventory-dialog aria-label="关闭弹窗">×</button></header><div>${html}</div>`;(q('#desktopWindowSurface')||document.body).appendChild(dialog);q('[data-close-inventory-dialog]',dialog).onclick=closeInventoryDialog;dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();}
+  function showBlacklist(storeId=selectedStoreId()){
+    const rows=readBlacklist(storeId),scope=country();
+    openInventoryDialog('店铺黑名单库',`<label>店铺<select id="inv18BlacklistStore">${(state.stores||[]).map(x=>`<option value="${escapeHtml(x.id)}" ${x.id===storeId?'selected':''}>${escapeHtml(x.name)}</option>`).join('')}</select></label><div class="inv18-blacklist-rows">${rows.length?rows.map((r,i)=>`<div><span><b>${escapeHtml(r.skuId)}</b> · ${escapeHtml(r.sku)}<small>${escapeHtml(r.title)}</small></span><button class="btn light sm" data-unblock="${i}">移出黑名单</button></div>`).join(''):'<p class="muted">此店铺暂无黑名单商品。</p>'}</div>`);
+    q('#inv18BlacklistStore').onchange=event=>showBlacklist(event.target.value);
+    qa('[data-unblock]').forEach(button=>button.onclick=()=>{if(scope!==country())return closeInventoryDialog();const next=readBlacklist(storeId);next.splice(Number(button.dataset.unblock),1);writeBlacklist(next,storeId);if(storeId===selectedStoreId())clearAnalysis();showBlacklist(storeId);toast('已移出黑名单，下次识别恢复处理');});
+  }
+  function editReviewRow(row,element){
+    const r=session.results.find(x=>x.row===row);if(!r)return;
+    try{const stocks=Object.fromEntries(qa('[data-review-stock]',element).map(input=>[input.dataset.reviewStock,r.forbiddenWarehouseIds.includes(input.dataset.reviewStock)?0:input.value]));engine.applyReview(r,{finalSku:q('[data-review-sku]',element).value,finalStatus:q('[data-review-status]',element).value,finalStocks:stocks},session.results,stockWarehouses());session.reviewDrafts.delete(row);refreshAudit();toast('此行人工修改已保存');}catch(error){toast(error.message,'err');}
+  }
   function sourceLabel(kind) {
     return { store: '店铺库存表', mabang: '马帮库存表', combo: '组合拆分表', presale: '店铺预售表' }[kind] || kind;
   }
@@ -533,7 +558,7 @@
       <label>SellerSKU（必选）<select data-inv15-base="storeSku">${columnOptions(storeColumns, config.storeSku)}</select></label>
       <label>SKU ID（关联预售）<select data-inv15-base="storeSkuId">${columnOptions(storeColumns, config.storeSkuId)}</select></label>
       <label>店铺商品标题<select data-inv15-base="storeTitle">${columnOptions(storeColumns, config.storeTitle)}</select></label>
-      <label>Status 状态（活动保护必选）<select data-inv15-base="storeStatus">${columnOptions(storeColumns, config.storeStatus)}</select></label>`;
+      <label>Status 上下架状态（必选）<select data-inv15-base="storeStatus">${columnOptions(storeColumns, config.storeStatus)}</select></label>`;
     if (mabangBox) mabangBox.innerHTML = `
       <label>库存 SKU 编号（必选）<select data-inv15-base="mabangSku">${columnOptions(mabangColumns, config.mabangSku)}</select></label>
       <label>马帮商品名称<select data-inv15-base="mabangName">${columnOptions(mabangColumns, config.mabangName)}</select></label>
@@ -664,7 +689,7 @@
 
   function readStoreRows(warehouses) {
     const data = session.store;
-    if (!config.storeSku || !config.storeSkuId || !config.storeStatus) throw new Error('店铺库存表必须选择 SellerSKU、SKU ID 和 Status 列（用于活动保护）');
+    if (!config.storeSku || !config.storeSkuId || !config.storeStatus) throw new Error('店铺库存表必须选择 SellerSKU、SKU ID 和 Status 列（用于上下架判断）');
     const presales=readPresaleIndex();
     const rows = [];
     for (let row = data.dataStartRow || data.row + 1; row <= data.sheet.maxRow; row += 1) {
@@ -685,6 +710,7 @@
   }
 
   function clearAnalysis() {
+    session.reviewDrafts.clear();resetReview();
     session.results = [];
     session.audit = null;session.context=null;
     if(q('#inv15ExportReview'))q('#inv15ExportReview').hidden=true;
@@ -721,10 +747,10 @@
         comboMap: session.combo.comboMap,
         warehouses,
         threshold: config.threshold,
-        overflowValue: config.overflowValue,excludedSkus:config.excludedSkus,relatedSkus:config.relatedSkus,
+        overflowValue: config.overflowValue,excludedSkus:config.excludedSkus,relatedSkus:config.relatedSkus,blacklistIds:readBlacklist().map(x=>x.skuId),
       });
-      session.context=scope;session.results = analysis.results;session.filter='all';session.query='';q('#inv15Filter').value='all';q('#inv15Search').value='';
-      session.audit = analysis.audit;
+      session.context=scope;session.results = analysis.results;session.filter='actionable';session.query='';q('#inv15Filter').value='actionable';q('#inv15Search').value='';
+      session.reviewDrafts.clear();resetReview();session.audit = analysis.audit;
       session.visibleLimit = 100;session.page=1;
       renderResults();
       toast(`识别完成：${analysis.audit.changedRows} 行将更新，${analysis.audit.unresolvedRows} 行需人工处理`, analysis.audit.ok ? 'ok' : 'err');
@@ -737,8 +763,8 @@
     }
   }
 
-  const FLOW_LABELS = {
-    activity_presale_unchanged:'活动中已预售',activity_manual_stockout:'活动缺货待处理',special_invalid_sku:'SKU特殊提示',special_excluded:'跳过识别',related_sku_replacement:'关联SKU替换',activity_protected:'保持原样',already_processed:'已处理 · 跳过',stock_cleared:'库存已清零',
+  const FLOW_LABELS = {pending_relist:'下架有货 · 待确认',relisted:'已同意上架',kept_inactive:'保持下架',shortage_inactive:'缺货下架',blacklisted:'黑名单冻结',manual_status:'上下架状态待核对',manual_sku_id:'SKU ID待核对',
+    already_compliant:'无需调整',special_invalid_sku:'SKU特殊提示',special_excluded:'跳过识别',related_sku_replacement:'关联SKU替换',already_processed:'已处理 · 跳过',stock_cleared:'库存已清零',
     flow1_original_warehouse: '流程一 · 原仓有货',
     flow2_same_sku_other_warehouse: '流程二 · 同 SKU 转仓',
     flow3_same_product_replacement: '流程三 · 同款换 SKU',
@@ -753,7 +779,7 @@
   };
 
   function tagHtml(tag) {
-    const type = tag === engine.TAGS.ANOMALY ? 'danger' : tag === engine.TAGS.ACTIVITY ? 'blue' : 'warn';
+    const type = tag === engine.TAGS.ANOMALY ? 'danger' : 'warn';
     return `<span class="chip ${type}">${escapeHtml(tag)}</span>`;
   }
 
@@ -767,29 +793,34 @@
   }
 
   function resultMatchesFilter(result) {
+    if(session.filter==='actionable')return result.changed||result.manual;
+    if(session.filter==='relist')return result.pendingRelist;
+    if(session.filter==='closepresale')return result.needsClosePresale;
+    if(session.filter==='blacklist')return result.blacklisted;
+    if(session.filter==='unchanged')return !result.changed&&!result.manual;
     if (session.filter === 'changed') return result.changed;
     if (session.filter === 'manual') return result.manual;
     if (session.filter === 'presale') return result.presale==='yes';
     if(session.filter==='special')return result.tags.includes(engine.TAGS.SPECIAL)||result.flow==='special_excluded';
     if(session.filter==='related')return result.flow==='related_sku_replacement';
     if (session.filter === 'anomaly') return result.tags.includes(engine.TAGS.ANOMALY);
-    if (session.filter === 'activity') return result.tags.includes(engine.TAGS.ACTIVITY);
     if (session.filter === 'processed') return ['already_processed','stock_cleared'].includes(result.flow);
     if (session.filter === 'combo') return result.kind === 'combo';
-    if (session.filter.startsWith('flow')) return result.flow === session.filter;
+    if (session.filter.startsWith('flow')) return result.flow === session.filter&&result.changed;
     return true;
   }
 
   function filteredResults() {
     const query = session.query.toLowerCase();
     return session.results.filter((result) => {
-      const text = `${result.originalSku} ${result.finalSku} ${result.title} ${result.mabangName} ${result.reasons.join(' ')}`.toLowerCase();
+      const text = `${result.skuId} ${result.status} ${result.finalStatus} ${result.originalSku} ${result.finalSku} ${result.title} ${result.mabangName} ${result.reasons.join(' ')}`.toLowerCase();
       const queryMatch = window.__fuzzySearchV14?.matches
         ? window.__fuzzySearchV14.matches(text, query, 'inventoryV15Search')
         : (!query || text.includes(query));
       return queryMatch && resultMatchesFilter(result);
     }).sort((left, right) => (
-      Number(right.manual) - Number(left.manual)
+      Number(!!right.pendingRelist) - Number(!!left.pendingRelist)
+      || Number(right.manual) - Number(left.manual)
       || Number(right.changed) - Number(left.changed)
       || left.row - right.row
     ));
@@ -799,9 +830,9 @@
     return {
       all: session.results.length,
       changed: session.results.filter((item) => item.changed).length,
-      flow1: session.results.filter((item) => item.flow === 'flow1_original_warehouse').length,
-      flow2: session.results.filter((item) => item.flow === 'flow2_same_sku_other_warehouse').length,
-      flow3: session.results.filter((item) => item.flow === 'flow3_same_product_replacement').length,
+      flow1: session.results.filter((item) => item.changed&&item.flow === 'flow1_original_warehouse').length,
+      flow2: session.results.filter((item) => item.changed&&item.flow === 'flow2_same_sku_other_warehouse').length,
+      flow3: session.results.filter((item) => item.changed&&item.flow === 'flow3_same_product_replacement').length,
       manual: session.results.filter((item) => item.manual).length,
       presale: session.results.filter((item) => item.presale==='yes').length,
       anomaly: session.results.filter((item) => item.tags.includes(engine.TAGS.ANOMALY)).length,
@@ -814,28 +845,16 @@
     return `<button class="inv15-metric ${tone} ${session.filter === filter ? 'active' : ''}" data-inv15-filter="${filter}"><span>${label}</span><b>${value}</b></button>`;
   }
 
-  function resultRowHtml(result, warehouses) {
-    const tags = result.tags.length ? result.tags.map(tagHtml).join('') : '<span class="chip good">自动通过</span>';
-    const skuChange = result.finalSku !== result.originalSku
-      ? `<code>${escapeHtml(result.originalSku)}</code><span class="inv15-arrow">→</span><code class="changed">${escapeHtml(result.finalSku)}</code>`
-      : `<code>${escapeHtml(result.originalSku)}</code>`;
-    const title = result.title || '店铺表未提供标题';
-    const mabang = result.mabangName ? `<small title="${escapeHtml(result.mabangName)}">马帮：${escapeHtml(result.mabangName)}</small>` : '<small>马帮：无名称或未匹配</small>';
-    const components = result.componentChecks.length
-      ? `<div class="inv15-components">${result.componentChecks.map((item) => `<span class="${item.ok ? 'ok' : 'bad'}">${escapeHtml(item.sku)} · ${item.available}/${item.quantity}</span>`).join('')}</div>`
-      : '';
-    return `<article class="inv15-result ${result.manual ? 'manual' : result.changed ? 'changed' : 'clean'}">
-      <div class="inv15-result-top">
-        <div class="inv15-tags">${tags}<span class="chip muted">${escapeHtml(FLOW_LABELS[result.flow] || result.flow)}</span></div>
-        <span class="inv15-row-number">原表第 ${result.row} 行</span>
-      </div>
-      <div class="inv15-result-grid">
-        <div class="inv15-result-cell sku"><label>SellerSKU</label><div class="inv15-sku-change">${skuChange}</div><p title="${escapeHtml(title)}">${escapeHtml(title)}</p><small>SKU ID：${escapeHtml(result.skuId)} · 预售：${result.presale==='yes'?'Yes':result.presale==='no'?'No':'未知'}</small>${mabang}</div>
-        <div class="inv15-result-cell"><label>店铺原库存</label><div class="inv15-stock-stack">${stockText(result.originalStocks, warehouses)}</div></div>
-        <div class="inv15-result-cell"><label>最终写入库存</label><div class="inv15-stock-stack">${stockText(result.finalStocks, warehouses)}</div></div>
-        <div class="inv15-result-cell reason"><label>判定明细</label><div>${result.reasons.map((reason) => `<p>• ${escapeHtml(reason)}</p>`).join('')}</div>${components}${result.nameSuggestions?.length?`<div class="inv15-name-suggestions"><b>中文名称候选（仅供人工确认）</b>${result.nameSuggestions.map(c=>`<p>${escapeHtml(c.sku)} · ${escapeHtml(c.name)} · ${(c.score*100).toFixed(1)}% · ${escapeHtml(c.warehouse)} ${c.stock}件</p>`).join('')}</div>`:''}</div>
-      </div>
-    </article>`;
+  function reviewStockInput(r,shown,w,disabled){return `<label><span title="${escapeHtml(w.name)}">${escapeHtml(w.name)}<small>原值 ${escapeHtml(r.originalStocks[w.id]??'空')}</small></span><input aria-label="${escapeHtml(w.name)} 最终库存 第${r.row}行" data-review-stock="${escapeHtml(w.id)}" type="number" min="0" step="1" value="${escapeHtml(shown.finalStocks[w.id]??'')}" ${disabled}></label>`;}
+  function resultRowHtml(r,warehouses){
+    const locked=r.frozen||r.pendingRelist||r.blacklisted||r.relistDecision==='kept',disabled=locked?'disabled':'';
+    const draft=session.reviewDrafts.get(r.row);const shown=draft?{...r,...draft,finalStocks:{...r.finalStocks,...draft.finalStocks}}:r;
+    return `<tr class="inv15-result ${r.pendingRelist?'inv18-urgent':r.manual?'manual':r.changed?'changed':'clean'}" data-review-row="${r.row}" ${draft?'data-dirty="true"':''}>
+      <td><span class="inv18-source-row">第${r.row}行 · ${escapeHtml(r.skuId)}</span><strong>${escapeHtml(r.originalSku)}</strong><small title="${escapeHtml(r.title)}">${escapeHtml(r.title)}</small><div class="inv15-tags">${r.tags.map(tagHtml).join('')}<span class="chip muted">${escapeHtml(FLOW_LABELS[r.flow]||r.flow)}</span></div></td>
+      <td><label class="inv18-mini-label">最终 SellerSKU</label><input data-review-sku value="${escapeHtml(shown.finalSku)}" ${disabled}><small>${r.presale==='yes'?'预售 Yes':r.presale==='no'?'预售 No':'预售未知'}</small><small>原状态 ${escapeHtml(r.status)}</small><select data-review-status ${disabled}><option value="active" ${shown.finalStatus==='active'?'selected':''}>active · 上架</option><option value="inactive" ${shown.finalStatus==='inactive'?'selected':''}>inactive · 下架</option></select></td>
+      <td><div class="inv18-stocks">${warehouses.filter(w=>!r.forbiddenWarehouseIds.includes(w.id)).map(w=>reviewStockInput(r,shown,w,disabled)).join('')}</div>${r.forbiddenWarehouseIds.length?`<details class="inv18-other-stock"><summary>非指定仓 · ${r.forbiddenWarehouseIds.length} 个${r.forbiddenWarehouseIds.some(id=>engine.number(r.originalStocks[id])>0)?' · 原有库存':''}</summary><div class="inv18-stocks">${warehouses.filter(w=>r.forbiddenWarehouseIds.includes(w.id)).map(w=>reviewStockInput(r,shown,w,'disabled')).join('')}</div></details>`:''}</td>
+      <td><div class="inv18-reasons">${r.reasons.map(x=>`<p>${escapeHtml(x)}</p>`).join('')}${r.pendingRelist&&r.proposal?`<b>建议 ${escapeHtml(r.proposal.finalSku)}</b><p>${warehouses.filter(w=>engine.number(r.proposal.finalStocks[w.id])>0).map(w=>escapeHtml(w.name)+'：'+r.proposal.finalStocks[w.id]).join('；')}</p>`:''}</div><div class="inv18-actions">${r.pendingRelist?`<div class="inv18-actions"><button class="btn primary sm" data-relist="yes">同意上架</button><button class="btn light sm" data-relist="no">保持下架</button></div>`:!locked?'<button class="btn light sm" data-save-review>保存本行修改</button>':''}${r.relistDecision?'<button class="btn light sm" data-reconsider>重新选择上架处理</button>':''}</div></td>
+      <td class="inv18-freeze"><button class="btn light sm" data-blacklist-row ${r.blacklisted||!r.skuId?'disabled':''} aria-label="冻结 SKU ID ${escapeHtml(r.skuId)}" title="加入店铺黑名单">×</button></td></tr>`;
   }
 
   function renderResults() {
@@ -844,7 +863,9 @@
     const counts = resultCounts();
     q('#inv15Metrics').innerHTML = [
       metricButton('all', '全部 SKU', counts.all),
-      metricButton('changed', '自动更新', counts.changed, 'good'),
+      metricButton('actionable','需要处理',session.results.filter(r=>r.changed||r.manual).length),
+      metricButton('unchanged','无需调整',session.results.filter(r=>!r.changed&&!r.manual).length),
+      metricButton('changed', '将修改', counts.changed, 'good'),
       metricButton('flow1_original_warehouse', '流程一', counts.flow1),
       metricButton('flow2_same_sku_other_warehouse', '流程二', counts.flow2),
       metricButton('flow3_same_product_replacement', '流程三', counts.flow3),
@@ -852,22 +873,26 @@
       metricButton('presale', '已开预售', counts.presale, 'warn'),
       metricButton('anomaly', '异常', counts.anomaly, 'danger'),
       metricButton('special','特殊提示',session.results.filter(r=>r.tags.includes(engine.TAGS.SPECIAL)||r.flow==='special_excluded').length),
-      metricButton('activity', '活动中', session.results.filter(r=>r.tags.includes(engine.TAGS.ACTIVITY)).length, 'blue'),
-      metricButton('processed', '已处理/清零',session.results.filter(r=>['already_processed','stock_cleared'].includes(r.flow)).length),
+      metricButton('relist','下架有货待确认',session.results.filter(r=>r.pendingRelist).length,'danger'),
+      metricButton('closepresale','有货需关预售',session.results.filter(r=>r.needsClosePresale).length,'warn'),
+      metricButton('blacklist','黑名单冻结',session.results.filter(r=>r.blacklisted).length),
+      metricButton('processed', '已处理',session.results.filter(r=>['already_processed','stock_cleared'].includes(r.flow)).length),
       metricButton('combo', '组合 SKU', counts.combo),
     ].join('');
     const filtered = filteredResults();
     const pages=Math.max(1,Math.ceil(filtered.length/100));session.page=Math.min(session.page||1,pages);
     const visible = filtered.slice((session.page-1)*100,session.page*100);
     q('#inv15ResultCount').textContent = `已分析 ${session.results.length} 条 · 筛选结果 ${filtered.length} 条`;
-    q('#inv15ResultList').innerHTML = visible.length ? visible.map((result) => resultRowHtml(result, warehouses)).join('') : '<div class="inv15-empty">当前筛选没有结果。</div>';
+    q('#inv15ResultList').innerHTML = visible.length ? `<table class="inv18-review-table"><thead><tr><th>商品 / 判断</th><th>SKU / 上下架 / 预售</th><th>库存核对与修改</th><th>原因 / 人工确认</th><th>冻结</th></tr></thead><tbody>${visible.map(r=>resultRowHtml(r,warehouses)).join('')}</tbody></table>` : '<div class="inv15-empty">当前筛选没有结果。</div>';
     q('#inv15More').innerHTML=`<span>第 ${session.page}/${pages} 页 · 每页100条 · 导出包含全部结果</span><button class="btn light" id="inv15Prev" ${session.page===1?'disabled':''}>上一页</button><button class="btn light" id="inv15Next" ${session.page===pages?'disabled':''}>下一页</button>`;
     q('#inv15Prev').onclick=()=>{session.page--;renderResults()};q('#inv15Next').onclick=()=>{session.page++;renderResults()};
     const audit = session.audit;
     q('#inv15Audit').innerHTML = audit?.ok
-      ? `<div class="inv15-audit good"><b>✓ 最终规则复核通过</b><span>${audit.changedRows} 行自动更新；${audit.unresolvedRows} 行需人工处理；</span></div>`
+      ? `<div class="inv15-audit good"><b>✓ 最终规则复核通过</b><span>${audit.changedRows} 行将写入修改；${audit.unresolvedRows} 行需人工处理；</span></div>`
       : `<div class="inv15-audit danger"><b>最终规则复核未通过</b><span>${audit?.failures?.map((item) => `第${item.row}行：${item.reason}`).join('；') || '未知错误'}</span></div>`;
-    q('#inv15ExportWorkbook').disabled = !audit?.ok;
+    const pending=session.results.some(r=>r.pendingRelist);q('#inv18Reviewed').disabled=pending||!audit?.ok;
+    q('#inv18ReviewHint').textContent=pending?'请先逐条选择同意上架或保持下架':'核对完成后勾选确认，即可导出';
+    q('#inv15ExportWorkbook').disabled = !audit?.ok||!session.reviewed||pending||session.reviewDrafts.size>0;
     q('#inv15ExportReview').hidden=!!audit?.ok;
     q('#inv15ExportManual').disabled = !counts.manual;
   }
@@ -897,7 +922,7 @@
     ].map(quoteCsv).join(','));
     const blob = new Blob([`\ufeff${headers.map(quoteCsv).join(',')}\r\n${lines.join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
     const storeName = state?.stores?.find((store) => store.id === selectedStoreId())?.name || '店铺';
-    downloadBlob(blob, `${storeName}_V17.7库存人工处理名单_${new Date().toISOString().slice(0, 10)}.csv`);
+    downloadBlob(blob, `${storeName}_V18.0库存人工处理名单_${new Date().toISOString().slice(0, 10)}.csv`);
   }
 
   async function prepareInventoryStyles(workbook) {
@@ -1009,19 +1034,20 @@
   }
 
   async function buildInventoryWorkbook(options={}) {
+    if(!options.reviewOnly&&(!session.reviewed||session.reviewDrafts.size||session.results.some(r=>r.pendingRelist)))throw Error('请先完成下架有货商品确认，并勾选二次核对完成');
     if(!options.reviewOnly&&!session.audit?.ok)throw Error('存在未解决的多仓库存异常，正式导出已阻止；可下载预览供核对');
     if(session.context!==contextKey()||session.restoring)throw Error('国家或店铺已变化，请重新识别');
-    const sourceContext=session.context,warehouses = stockWarehouses();
+    const sourceContext=session.context,reviewRevision=session.reviewRevision,warehouses = stockWarehouses();
     const workbook = await openWorkbook(session.store.buffer.slice(0));
     await prepareInventoryStyles(workbook);
     const definition = workbook.sheets.find((item) => item.path === session.store.definition.path);
     if (!definition) throw new Error('导出时找不到原店铺工作表');
     const sheet = await getSheet(workbook, definition);
     for (const result of session.results) {
-      // V17.7: protected and already-completed rows retain original XML, including cell types.
-      if(result.activityProtected||result.preserveRow||(result.flow==='already_processed'&&!result.changed))continue;
+      // V18.0: protected and already-completed rows retain original XML, including cell types.
+      if(result.preserveRow||(result.flow==='already_processed'&&!result.changed))continue;
       setInventoryTextCell(workbook, sheet, result.row, Number(config.storeSku), result.finalSku);
-      if (config.storeStatus) setInventoryTextCell(workbook, sheet, result.row, Number(config.storeStatus), result.status);
+      if (config.storeStatus) setInventoryTextCell(workbook, sheet, result.row, Number(config.storeStatus), result.finalStatus);
       for (const warehouse of warehouses) {
         const value=result.finalStocks[warehouse.id];
         if(value!=null&&clean(value)!==''&&engine.stockNumber(value)==null&&!result.changed)continue;
@@ -1031,7 +1057,7 @@
     workbook.zip.file(definition.path, serializeXml(sheet.doc));
     flushInventoryStyles(workbook);
     const buffer = await workbook.zip.generateAsync({ type: 'arraybuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
-    if(sourceContext!==contextKey()||session.context!==sourceContext)throw Error('生成期间国家或店铺发生变化，导出已停止');
+    if(sourceContext!==contextKey()||session.context!==sourceContext||session.reviewRevision!==reviewRevision)throw Error('生成期间国家、店铺或人工核对内容发生变化，导出已停止');
     await verifyInventoryWorkbook(buffer, warehouses);
     return new Blob([buffer], { type: MIME_XLSX });
   }
@@ -1047,6 +1073,7 @@
       const skuCell = rowNode && inv15FindCell(rowNode, Number(config.storeSku));
       if (!['inlineStr','s'].includes(skuCell?.getAttribute('t'))) failures.push(`第${result.row}行 SellerSKU 文本格式`);
       if (config.storeStatus) {
+        if(clean(cellValue(sheet,result.row,Number(config.storeStatus)))!==result.finalStatus)failures.push(`第${result.row}行 Status值`);
         const statusCell = rowNode && inv15FindCell(rowNode, Number(config.storeStatus));
         if (!['inlineStr','s'].includes(statusCell?.getAttribute('t'))) failures.push(`第${result.row}行 Status 文本格式`);
       }
@@ -1057,7 +1084,7 @@
           if (actual !== null && clean(actual) !== '') failures.push(`第${result.row}行 ${warehouse.name} 应为空`);
         } else if (engine.number(actual) !== engine.number(expected)) failures.push(`第${result.row}行 ${warehouse.name} 库存`);
         if(expected!=null&&clean(expected)!==''&&engine.stockNumber(expected)==null&&!result.changed)continue;
-        if(result.activityProtected||result.preserveRow||(result.flow==='already_processed'&&!result.changed))continue;
+        if(result.preserveRow||(result.flow==='already_processed'&&!result.changed))continue;
         const stockCell = rowNode && inv15FindCell(rowNode, Number(warehouse.storeColumn));
         if (expected !== null && expected !== undefined && expected !== '' && stockCell?.hasAttribute('t')) failures.push(`第${result.row}行 ${warehouse.name} 数字格式`);
       }
@@ -1068,6 +1095,7 @@
 
   async function exportInventoryWorkbook() {
     if (session.exporting) return;
+    if(session.reviewDrafts.size)return toast('请先保存本行修改，再确认导出','err');
     if (!session.audit?.ok || !session.results.length) return toast('请先完成库存识别与最终规则复核', 'err');
     session.exporting = true;
     const button = q('#inv15ExportWorkbook');
@@ -1076,7 +1104,7 @@
     try {
       const blob = await buildInventoryWorkbook();
       const storeName = state?.stores?.find((store) => store.id === selectedStoreId())?.name || '店铺';
-      const filename = `${storeName}_V17.7库存更新_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const filename = `${storeName}_V18.0库存更新_${new Date().toISOString().slice(0, 10)}.xlsx`;
       downloadBlob(blob, filename);
       toast(`已生成 ${filename}；原模板结构保留，成品二次识别通过`, 'ok');
     } catch (error) {
@@ -1190,29 +1218,29 @@
           <label>不足阈值（固定）<input id="inv15Threshold" type="number" value="10" readonly></label>
           <label>超过阈值写入<input id="inv15Overflow" type="number" value="9999" readonly></label>
         </div>
-        <button class="inv15-run" id="inv15Analyze" type="button">执行库存识别</button>
+        <div class="inv18-command-actions"><button class="inv15-run" id="inv15Analyze" type="button">执行库存识别</button><button class="btn light" id="inv18Blacklist" type="button">黑名单库</button></div>
 
       </section>
 
       <section class="inv15-panel inv15-results-panel">
         <div class="inv15-panel-head results">
-          <div><h3>最终库存结果与人工处理名单</h3></div>
+          <div><h3>库存判断与人工二次核对</h3></div>
           <div class="inv15-panel-actions"><button class="btn light" id="inv15ExportReview" hidden>导出预览供核对</button><button class="btn light" id="inv15ExportManual" disabled>导出人工处理名单</button><button class="btn primary" id="inv15ExportWorkbook" disabled>导出最终店铺库存表</button></div>
         </div>
-        <div id="inv15Audit"></div>
+        <div id="inv15Audit"></div><label class="inv18-review-confirm"><input type="checkbox" id="inv18Reviewed">已完成二次核对</label><span id="inv18ReviewHint"></span>
         <div class="inv15-metrics" id="inv15Metrics"></div>
         <div class="inv15-toolbar">
           <input id="inv15Search" placeholder="搜索 SKU、店铺标题、马帮商品或原因">
           <select id="inv15Filter">
-            <option value="all">全部结果</option>
-            <option value="changed">只看自动更新</option>
+            <option value="actionable">需要处理</option><option value="unchanged">无需调整</option><option value="all">全部结果</option>
+            <option value="changed">只看将修改</option>
             <option value="flow1_original_warehouse">流程一 · 原仓有货</option>
             <option value="flow2_same_sku_other_warehouse">流程二 · 同 SKU 转仓</option>
             <option value="flow3_same_product_replacement">流程三 · 同款换 SKU</option>
             <option value="manual">全部人工处理</option>
             <option value="presale">已开预售</option>
             <option value="anomaly">异常标签</option><option value="special">特殊提示 / 跳过识别</option><option value="related">关联SKU替换</option>
-            <option value="activity">活动中</option><option value="processed">已处理 / 清零完成</option>
+            <option value="relist">下架有货待确认</option><option value="closepresale">有货需关预售</option><option value="blacklist">黑名单冻结</option><option value="processed">已处理</option>
             <option value="combo">组合 SKU</option>
           </select>
           <div class="inv15-filter-status"><span id="inv15ResultCount">尚未分析</span><button type="button" class="btn light sm" id="inv15ShowAll">显示全部</button></div>
@@ -1235,10 +1263,13 @@
     q('#inv15AddExcluded').onclick=()=>addSpecialRule('excluded');q('#inv15AddRelated').onclick=()=>addSpecialRule('related');
     q('#inv15WarehousePicker').onclick=event=>{const button=event.target.closest('[data-inv15-pick-value]');if(!button)return;const row=qa('.inv15-warehouse-row[data-warehouse-id]').find(r=>r.dataset.warehouseId===q('#inv15WarehousePicker').dataset.warehouseId);const input=row?.querySelector('[data-inv15-mabang-value]');if(input){input.value=button.dataset.inv15PickValue;updateWarehouse(input);}q('#inv15WarehousePicker').hidePopover();};
     q('#inv15Analyze').addEventListener('click', analyzeInventory);
-    q('#inv15ExportReview').addEventListener('click',async()=>{try{const blob=await buildInventoryWorkbook({reviewOnly:true});downloadBlob(blob,`${state.stores.find(x=>x.id===selectedStoreId())?.name||'店铺'}_库存预览_含待确认行_V17.7.xlsx`)}catch(error){toast(error.message,'err')}});
+    q('#inv18Blacklist').onclick=()=>showBlacklist();
+    q('#inv18Reviewed').onchange=event=>{session.reviewed=event.target.checked;q('#inv15ExportWorkbook').disabled=!session.reviewed||!session.audit?.ok||session.reviewDrafts.size>0||session.results.some(r=>r.pendingRelist);};
+    q('#inv15ExportReview').addEventListener('click',async()=>{try{const blob=await buildInventoryWorkbook({reviewOnly:true});downloadBlob(blob,`${state.stores.find(x=>x.id===selectedStoreId())?.name||'店铺'}_库存预览_含待确认行_V18.0.xlsx`)}catch(error){toast(error.message,'err')}});
     q('#inv15ExportManual').addEventListener('click', exportManualList);
     q('#inv15ExportWorkbook').addEventListener('click', exportInventoryWorkbook);
     q('#inv15StoreSelect').addEventListener('change', async (event) => {
+      closeInventoryDialog();
       session.storeId = event.target.value;config=loadConfig();
       window.selectedStoreId = session.storeId;
       q('#inv15StoreScope').textContent = sourceScope('store');
@@ -1255,12 +1286,21 @@
     });
     page.addEventListener('change', (event) => {
       const target = event.target;
+      if(target.matches('[data-review-status]'))target.dispatchEvent(new Event('input',{bubbles:true}));
       if (target.matches('[data-inv15-base]')) updateBaseMapping(target);
       if (target.matches('[data-inv15-warehouse-name],[data-inv15-store-column],[data-inv15-mabang-stock],[data-inv15-mabang-value]')) updateWarehouse(target);
       if(target.matches('[data-inv15-choose-warehouse]')&&target.value){const input=target.closest('[data-warehouse-id]').querySelector('[data-inv15-mabang-value]');input.value=target.value;updateWarehouse(input);target.value='';}
     });
-    page.addEventListener('input',event=>{if(event.target.matches('[data-inv15-mabang-value]'))updateWarehouse(event.target);});
+    page.addEventListener('input',event=>{if(event.target.closest('[data-review-row]')){resetReview();q('#inv15ExportWorkbook').disabled=true;const row=event.target.closest('[data-review-row]');row.dataset.dirty='true';session.reviewDrafts.set(Number(row.dataset.reviewRow),{finalSku:q('[data-review-sku]',row).value,finalStatus:q('[data-review-status]',row).value,finalStocks:Object.fromEntries(qa('[data-review-stock]',row).map(x=>[x.dataset.reviewStock,x.value]))});}if(event.target.matches('[data-inv15-mabang-value]'))updateWarehouse(event.target);});
     page.addEventListener('click', (event) => {
+      const reviewRow=event.target.closest('[data-review-row]');
+      if(reviewRow){const r=session.results.find(x=>x.row===Number(reviewRow.dataset.reviewRow));if(!r)return;
+        if(event.target.closest('[data-blacklist-row]')){blacklistRow(r);return;}
+        const relist=event.target.closest('[data-relist]');if(relist){engine.decideRelist(r,relist.dataset.relist==='yes',stockWarehouses());refreshAudit();return;}
+        if(event.target.closest('[data-reconsider]')){Object.assign(r,{finalSku:r.originalSku,finalStatus:r.status,finalStocks:{...r.originalStocks},preserveRow:true,pendingRelist:true,relistDecision:null,flow:'pending_relist',reasons:['下架商品有货或有可换SKU，等待人工同意上架；确认前整行保留']});if(!r.tags.includes('下架商品有货'))r.tags.push('下架商品有货');session.reviewDrafts.delete(r.row);refreshAudit();return;}
+        if(event.target.closest('[data-save-review]')){editReviewRow(r.row,reviewRow);return;}
+      }
+
       const openPicker=event.target.closest('[data-inv15-open-warehouse]');if(openPicker){openWarehousePicker(openPicker);return;}
       const removeExcluded=event.target.closest('[data-inv15-remove-excluded]'),removeRelated=event.target.closest('[data-inv15-remove-related]');
       if(removeExcluded||removeRelated){const kind=removeExcluded?'excludedSkus':'relatedSkus',index=Number(removeExcluded?removeExcluded.dataset.inv15RemoveExcluded:removeRelated.dataset.inv15RemoveRelated);config[kind].splice(index,1);saveConfig();clearAnalysis();renderSpecialSkus();return;}
@@ -1278,6 +1318,7 @@
     });
 
     window.addEventListener('country-changed', () => {
+      closeInventoryDialog();
       if(q('#inv15WarehousePicker').matches(':popover-open'))q('#inv15WarehousePicker').hidePopover();
       for(const id of ['inv15ExcludeSku','inv15RelatedFrom','inv15RelatedTo'])q('#'+id).value='';
       populateStores();config=loadConfig();
@@ -1323,8 +1364,11 @@
       clearSource,
       analyze: analyzeInventory,
       buildWorkbookForTest: () => buildInventoryWorkbook({reviewOnly:true}),
+      buildFinalForTest:()=>buildInventoryWorkbook(),
       verifyWorkbookForTest: verifyInventoryWorkbook,
       engine,
+      readBlacklist,writeBlacklist,showBlacklist,blacklistRow,
+      decideRelistForTest:(row,approved)=>{engine.decideRelist(session.results.find(x=>x.row===row),approved,stockWarehouses());refreshAudit();},
     };
     window.__inventoryV13 = {
       ready: true,
