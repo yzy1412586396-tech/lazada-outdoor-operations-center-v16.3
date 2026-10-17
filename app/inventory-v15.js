@@ -15,6 +15,7 @@
     context: null,
     results: [],
     reviewDrafts:new Map(),reviewed:false,
+    selectedRows:new Set(),selectionScope:'',
     audit: null,
     storeId: '',
     filter: 'actionable',
@@ -118,10 +119,58 @@
   function resetReview(){session.reviewRevision=(session.reviewRevision||0)+1;session.reviewed=false;if(q('#inv18Reviewed'))q('#inv18Reviewed').checked=false;}
   function refreshAudit(){resetReview();session.audit=engine.auditResults(session.results,stockWarehouses());renderResults();}
   function freezeBlacklisted(r){Object.assign(r,{blacklisted:true,frozen:true,preserveRow:true,pendingRelist:false,relistDecision:null,proposal:null,manualEdited:false,selectedWarehouseId:'',needsClosePresale:false,finalSku:r.originalSku,finalStatus:r.status,finalStocks:{...r.originalStocks},tags:[],reasons:['店铺黑名单冻结，原行保留'],flow:'blacklisted'});engine.recalculate(r,stockWarehouses());}
-  function blacklistRow(r){
-    if(!r.skuId)return toast('SKU ID缺失，不能加入黑名单','err');
-    const scope=contextKey();openInventoryDialog('加入店铺黑名单',`<p>确认冻结 SKU ID <b>${escapeHtml(r.skuId)}</b>？</p><p>${escapeHtml(r.originalSku)} · ${escapeHtml(r.title)}</p><p>以后当前店铺识别到此ID，整行保留。</p><button class="btn primary" data-confirm-blacklist>确认加入</button>`);
-    q('[data-confirm-blacklist]').onclick=()=>{if(scope!==contextKey())return closeInventoryDialog();const rows=readBlacklist();if(!rows.some(x=>x.skuId===r.skuId)){rows.push({skuId:r.skuId,sku:r.originalSku,title:r.title,createdAt:new Date().toISOString()});writeBlacklist(rows);}for(const item of session.results)if(item.skuId===r.skuId){freezeBlacklisted(item);session.reviewDrafts.delete(item.row);}closeInventoryDialog();refreshAudit();};
+  function blacklistRow(r){blacklistRows([r]);}
+  function blacklistRows(selected){
+    const eligible=selected.filter(r=>r.skuId&&!r.blacklisted);
+    if(!eligible.length)return toast('所选商品没有可加入黑名单的 SKU ID','err');
+    const ids=new Set(eligible.map(r=>r.skuId)),scope=contextKey(),snapshot=session.results;
+    openInventoryDialog('加入店铺黑名单',`<p>确认将当前店铺的 <b>${ids.size}</b> 个 SKU ID 加入黑名单？</p><p>这些商品将恢复原表整行，后续识别保持冻结。</p><button class="btn primary" data-confirm-blacklist>确认加入</button>`);
+    q('[data-confirm-blacklist]').onclick=()=>{
+      if(scope!==contextKey()||snapshot!==session.results)return closeInventoryDialog();
+      const rows=readBlacklist(),existing=new Set(rows.map(r=>r.skuId));
+      for(const r of eligible)if(!existing.has(r.skuId)){rows.push({skuId:r.skuId,sku:r.originalSku,title:r.title,createdAt:new Date().toISOString()});existing.add(r.skuId);}
+      writeBlacklist(rows);
+      for(const r of session.results)if(ids.has(r.skuId)){freezeBlacklisted(r);session.reviewDrafts.delete(r.row);}
+      session.selectedRows.clear();closeInventoryDialog();refreshAudit();toast(`已加入 ${ids.size} 个 SKU ID 到当前店铺黑名单`);
+    };
+  }
+  function selectedReviewRows(){return session.results.filter(r=>session.selectedRows.has(r.row));}
+  function updateBatchControls(){
+    const selected=selectedReviewRows(),pending=selected.filter(r=>r.pendingRelist&&!r.frozen&&!r.blacklisted).length;
+    const eligible=filteredResults().filter(r=>!r.blacklisted),count=eligible.filter(r=>session.selectedRows.has(r.row)).length;
+    for(const input of qa('[data-select-filtered]')){input.checked=eligible.length>0&&count===eligible.length;input.indeterminate=count>0&&count<eligible.length;input.disabled=!eligible.length;}
+    const countLabel=q('#inv182SelectedCount');if(!countLabel)return;
+    countLabel.textContent=`已选 ${selected.length} 条`;
+    q('#inv182BatchBlacklist').disabled=!selected.some(r=>r.skuId&&!r.blacklisted);
+    q('#inv182BatchSave').disabled=!selected.some(r=>!r.frozen&&!r.blacklisted&&!r.pendingRelist&&r.relistDecision!=='kept');
+    q('#inv182BatchApprove').disabled=q('#inv182BatchKeep').disabled=!pending;
+    q('#inv182ClearSelection').disabled=!selected.length;
+    for(const box of qa('[data-select-review]')){box.checked=session.selectedRows.has(Number(box.dataset.selectReview));box.closest('tr').classList.toggle('inv182-selected',box.checked);}
+  }
+  function batchReview(action){
+    const selected=selectedReviewRows();if(!selected.length)return;
+    // Validate on copies first: any error leaves every result and every draft intact.
+    const next=structuredClone(session.results),warehouses=stockWarehouses();let count=0;const applied=new Set();
+    try{
+      for(const r of next){
+        if(!session.selectedRows.has(r.row)||r.blacklisted||r.frozen)continue;
+        if(action==='approve'||action==='keep'){
+          if(!r.pendingRelist)continue;
+          engine.decideRelist(r,action==='approve',warehouses);
+        }else{
+          if(r.pendingRelist||r.relistDecision==='kept')continue;
+          const draft=session.reviewDrafts.get(r.row);
+          if(draft)engine.applyReview(r,draft,next,warehouses);
+        }
+        applied.add(r.row);count++;
+      }
+      const audit=engine.auditResults(next,warehouses);
+      if(!audit.ok)throw Error(audit.failures.map(x=>`第${x.row}行：${x.reason}`).join('；'));
+      if(!count)return toast('所选商品不适用此操作','err');
+      for(let i=0;i<next.length;i++)if(applied.has(next[i].row))Object.assign(session.results[i],next[i]);
+      for(const row of applied){session.reviewDrafts.delete(row);session.selectedRows.delete(row);}
+      refreshAudit();toast(`${action==='approve'?'已同意上架':action==='keep'?'已保持下架':'已保留并保存修改'} ${count} 条${selected.length>count?`；${selected.length-count} 条不适用，仍保持勾选`:''}`);
+    }catch(error){toast('批量操作未应用：'+error.message,'err');}
   }
   function closeInventoryDialog(){const dialog=q('#inv18Dialog');if(dialog?.open)dialog.close();dialog?.remove();}
   function openInventoryDialog(title,html){closeInventoryDialog();const dialog=document.createElement('dialog');dialog.id='inv18Dialog';dialog.className='inv18-dialog';dialog.innerHTML=`<header><h3>${escapeHtml(title)}</h3><button class="btn light sm" data-close-inventory-dialog aria-label="关闭弹窗">×</button></header><div>${html}</div>`;(q('#desktopWindowSurface')||document.body).appendChild(dialog);q('[data-close-inventory-dialog]',dialog).onclick=closeInventoryDialog;dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();}
@@ -713,7 +762,8 @@
   }
 
   function clearAnalysis() {
-    session.reviewDrafts.clear();resetReview();
+    session.reviewDrafts.clear();session.selectedRows.clear();resetReview();
+    if(q('#inv182Batch'))q('#inv182Batch').hidden=true;
     session.results = [];
     session.audit = null;session.context=null;
     if(q('#inv15ExportReview'))q('#inv15ExportReview').hidden=true;
@@ -753,7 +803,8 @@
         overflowValue: config.overflowValue,excludedSkus:config.excludedSkus,relatedSkus:config.relatedSkus,blacklistIds:readBlacklist().map(x=>x.skuId),
       });
       session.context=scope;session.results = analysis.results;session.filter='actionable';session.query='';q('#inv15Filter').value='actionable';q('#inv15Search').value='';
-      session.reviewDrafts.clear();resetReview();session.audit = analysis.audit;
+      session.reviewDrafts.clear();session.selectedRows.clear();resetReview();
+    if(q('#inv182Batch'))q('#inv182Batch').hidden=true;session.audit = analysis.audit;
       session.visibleLimit = 100;session.page=1;
       renderResults();
       toast(`识别完成：${analysis.audit.changedRows} 行将更新，${analysis.audit.unresolvedRows} 行需人工处理`, analysis.audit.ok ? 'ok' : 'err');
@@ -856,6 +907,7 @@
     const locked=r.frozen||r.pendingRelist||r.blacklisted||r.relistDecision==='kept',disabled=locked?'disabled':'';
     const draft=session.reviewDrafts.get(r.row);const shown=draft?{...r,...draft,finalStocks:{...r.finalStocks,...draft.finalStocks}}:r;
     return `<tr class="inv15-result ${r.pendingRelist?'inv18-urgent':r.manual?'manual':r.changed?'changed':'clean'}" data-review-row="${r.row}" ${draft?'data-dirty="true"':''}>
+      <td class="inv182-selection-cell"><input type="checkbox" data-select-review="${r.row}" aria-label="选择第${r.row}行 ${escapeHtml(r.originalSku)}" ${session.selectedRows.has(r.row)?'checked':''} ${r.blacklisted?'disabled':''}></td>
       <td><span class="inv18-source-row">第${r.row}行 · ${escapeHtml(r.skuId)}</span><strong>${escapeHtml(r.originalSku)}</strong><small class="inv18-mabang-name" title="${escapeHtml(r.originalMabangName||'')}">马帮中文名：${escapeHtml(r.originalMabangName||'未匹配中文名称')}</small><small title="${escapeHtml(r.title)}">${escapeHtml(r.title)}</small><div class="inv15-tags">${needsDelisting(r)?'<span class="chip warn">需下架</span>':''}${r.tags.map(tagHtml).join('')}<span class="chip muted">${escapeHtml(FLOW_LABELS[r.flow]||r.flow)}</span></div></td>
       <td><label class="inv18-mini-label">最终 SellerSKU</label><input data-review-sku value="${escapeHtml(shown.finalSku)}" ${disabled}><small>${r.presale==='yes'?'预售 Yes':r.presale==='no'?'预售 No':'预售未知'}</small><small>原状态 ${escapeHtml(r.status)}</small><select data-review-status ${disabled}><option value="active" ${shown.finalStatus==='active'?'selected':''}>active · 上架</option><option value="inactive" ${shown.finalStatus==='inactive'?'selected':''}>inactive · 下架</option></select></td>
       <td><div class="inv18-stocks">${warehouses.filter(w=>!r.forbiddenWarehouseIds.includes(w.id)).map(w=>reviewStockInput(r,shown,w,disabled)).join('')}</div>${r.forbiddenWarehouseIds.length?`<details class="inv18-other-stock"><summary>非指定仓 · ${r.forbiddenWarehouseIds.length} 个${r.forbiddenWarehouseIds.some(id=>engine.number(r.originalStocks[id])>0)?' · 原有库存':''}</summary><div class="inv18-stocks">${warehouses.filter(w=>r.forbiddenWarehouseIds.includes(w.id)).map(w=>reviewStockInput(r,shown,w,'disabled')).join('')}</div></details>`:''}</td>
@@ -886,11 +938,14 @@
       metricButton('processed', '已处理',session.results.filter(r=>['already_processed','stock_cleared'].includes(r.flow)).length),
       metricButton('combo', '组合 SKU', counts.combo),
     ].join('');
+    const selectionScope=JSON.stringify([contextKey(),session.filter,session.query]);
+    if(session.selectionScope!==selectionScope){session.selectedRows.clear();session.selectionScope=selectionScope;}
     const filtered = filteredResults();
     const pages=Math.max(1,Math.ceil(filtered.length/100));session.page=Math.min(session.page||1,pages);
     const visible = filtered.slice((session.page-1)*100,session.page*100);
     q('#inv15ResultCount').textContent = `已分析 ${session.results.length} 条 · 筛选结果 ${filtered.length} 条`;
-    q('#inv15ResultList').innerHTML = visible.length ? `<table class="inv18-review-table"><thead><tr><th>商品 / 判断</th><th>SKU / 上下架 / 预售</th><th>库存核对与修改</th><th>原因 / 人工确认</th><th>冻结</th></tr></thead><tbody>${visible.map(r=>resultRowHtml(r,warehouses)).join('')}</tbody></table>` : '<div class="inv15-empty">当前筛选没有结果。</div>';
+    q('#inv15ResultList').innerHTML = visible.length ? `<table class="inv18-review-table"><thead><tr><th class="inv182-selection-cell"><input type="checkbox" data-select-filtered aria-label="全选当前筛选全部页"></th><th>商品 / 判断</th><th>SKU / 上下架 / 预售</th><th>库存核对与修改</th><th>原因 / 人工确认</th><th>冻结</th></tr></thead><tbody>${visible.map(r=>resultRowHtml(r,warehouses)).join('')}</tbody></table>` : '<div class="inv15-empty">当前筛选没有结果。</div>';
+    q('#inv182Batch').hidden=false;updateBatchControls();
     q('#inv15More').innerHTML=`<span>第 ${session.page}/${pages} 页 · 每页100条 · 导出包含全部结果</span><button class="btn light" id="inv15Prev" ${session.page===1?'disabled':''}>上一页</button><button class="btn light" id="inv15Next" ${session.page===pages?'disabled':''}>下一页</button>`;
     q('#inv15Prev').onclick=()=>{session.page--;renderResults()};q('#inv15Next').onclick=()=>{session.page++;renderResults()};
     const audit = session.audit;
@@ -929,7 +984,7 @@
     ].map(quoteCsv).join(','));
     const blob = new Blob([`\ufeff${headers.map(quoteCsv).join(',')}\r\n${lines.join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
     const storeName = state?.stores?.find((store) => store.id === selectedStoreId())?.name || '店铺';
-    downloadBlob(blob, `${storeName}_V18.1库存人工处理名单_${new Date().toISOString().slice(0, 10)}.csv`);
+    downloadBlob(blob, `${storeName}_V18.2库存人工处理名单_${new Date().toISOString().slice(0, 10)}.csv`);
   }
 
   async function prepareInventoryStyles(workbook) {
@@ -1111,7 +1166,7 @@
     try {
       const blob = await buildInventoryWorkbook();
       const storeName = state?.stores?.find((store) => store.id === selectedStoreId())?.name || '店铺';
-      const filename = `${storeName}_V18.1库存更新_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const filename = `${storeName}_V18.2库存更新_${new Date().toISOString().slice(0, 10)}.xlsx`;
       downloadBlob(blob, filename);
       toast(`已生成 ${filename}；原模板结构保留，成品二次识别通过`, 'ok');
     } catch (error) {
@@ -1262,6 +1317,14 @@
           </select>
           <div class="inv15-filter-status"><span id="inv15ResultCount">尚未分析</span><button type="button" class="btn light sm" id="inv15ShowAll">显示全部</button></div>
         </div>
+        <div id="inv182Batch" class="inv182-batch" hidden>
+          <label><input type="checkbox" data-select-filtered>全选筛选结果（全部页）</label><b id="inv182SelectedCount">已选 0 条</b>
+          <button class="btn light sm" id="inv182ClearSelection" disabled>取消选择</button>
+          <button class="btn light sm" id="inv182BatchSave" disabled>保留并保存修改</button>
+          <button class="btn primary sm" id="inv182BatchApprove" disabled>同意上架</button>
+          <button class="btn light sm" id="inv182BatchKeep" disabled>保持下架</button>
+          <button class="btn light sm" id="inv182BatchBlacklist" disabled>加入黑名单</button>
+        </div>
         <div id="inv15ResultList" class="inv15-result-list"><div class="inv15-empty">四张表就绪后，点击“执行库存识别”。</div></div>
         <div id="inv15More" class="inv15-more"></div>
       </section>`;
@@ -1282,8 +1345,13 @@
     q('#inv15WarehousePicker').onclick=event=>{const button=event.target.closest('[data-inv15-pick-value]');if(!button)return;const row=qa('.inv15-warehouse-row[data-warehouse-id]').find(r=>r.dataset.warehouseId===q('#inv15WarehousePicker').dataset.warehouseId);const input=row?.querySelector('[data-inv15-mabang-value]');if(input){input.value=button.dataset.inv15PickValue;updateWarehouse(input);}q('#inv15WarehousePicker').hidePopover();};
     q('#inv15Analyze').addEventListener('click', analyzeInventory);
     q('#inv18Blacklist').onclick=()=>showBlacklist();
+    q('#inv182BatchBlacklist').onclick=()=>blacklistRows(selectedReviewRows());
+    q('#inv182BatchSave').onclick=()=>batchReview('save');
+    q('#inv182BatchApprove').onclick=()=>batchReview('approve');
+    q('#inv182BatchKeep').onclick=()=>batchReview('keep');
+    q('#inv182ClearSelection').onclick=()=>{session.selectedRows.clear();updateBatchControls();};
     q('#inv18Reviewed').onchange=event=>{session.reviewed=event.target.checked;q('#inv15ExportWorkbook').disabled=!session.reviewed||!session.audit?.ok||session.reviewDrafts.size>0||session.results.some(r=>r.pendingRelist);};
-    q('#inv15ExportReview').addEventListener('click',async()=>{try{const blob=await buildInventoryWorkbook({reviewOnly:true});downloadBlob(blob,`${state.stores.find(x=>x.id===selectedStoreId())?.name||'店铺'}_库存预览_含待确认行_V18.1.xlsx`)}catch(error){toast(error.message,'err')}});
+    q('#inv15ExportReview').addEventListener('click',async()=>{try{const blob=await buildInventoryWorkbook({reviewOnly:true});downloadBlob(blob,`${state.stores.find(x=>x.id===selectedStoreId())?.name||'店铺'}_库存预览_含待确认行_V18.2.xlsx`)}catch(error){toast(error.message,'err')}});
     q('#inv15ExportManual').addEventListener('click', exportManualList);
     q('#inv15ExportWorkbook').addEventListener('click', exportInventoryWorkbook);
     q('#inv15StoreSelect').addEventListener('change', async (event) => {
@@ -1304,12 +1372,14 @@
     });
     page.addEventListener('change', (event) => {
       const target = event.target;
+      if(target.matches('[data-select-review]')){const row=Number(target.dataset.selectReview);if(target.checked)session.selectedRows.add(row);else session.selectedRows.delete(row);updateBatchControls();return;}
+      if(target.matches('[data-select-filtered]')){session.selectedRows.clear();if(target.checked)for(const r of filteredResults())if(!r.blacklisted)session.selectedRows.add(r.row);updateBatchControls();return;}
       if(target.matches('[data-review-status]'))target.dispatchEvent(new Event('input',{bubbles:true}));
       if (target.matches('[data-inv15-base]')) updateBaseMapping(target);
       if (target.matches('[data-inv15-warehouse-name],[data-inv15-store-column],[data-inv15-mabang-stock],[data-inv15-mabang-value]')) updateWarehouse(target);
       if(target.matches('[data-inv15-choose-warehouse]')&&target.value){const input=target.closest('[data-warehouse-id]').querySelector('[data-inv15-mabang-value]');input.value=target.value;updateWarehouse(input);target.value='';}
     });
-    page.addEventListener('input',event=>{if(event.target.closest('[data-review-row]')){resetReview();q('#inv15ExportWorkbook').disabled=true;const row=event.target.closest('[data-review-row]');row.dataset.dirty='true';session.reviewDrafts.set(Number(row.dataset.reviewRow),{finalSku:q('[data-review-sku]',row).value,finalStatus:q('[data-review-status]',row).value,finalStocks:Object.fromEntries(qa('[data-review-stock]',row).map(x=>[x.dataset.reviewStock,x.value]))});}if(event.target.matches('[data-inv15-mabang-value]'))updateWarehouse(event.target);});
+    page.addEventListener('input',event=>{if(event.target.matches('[data-review-sku],[data-review-status],[data-review-stock]')){resetReview();q('#inv15ExportWorkbook').disabled=true;const row=event.target.closest('[data-review-row]');row.dataset.dirty='true';session.reviewDrafts.set(Number(row.dataset.reviewRow),{finalSku:q('[data-review-sku]',row).value,finalStatus:q('[data-review-status]',row).value,finalStocks:Object.fromEntries(qa('[data-review-stock]',row).map(x=>[x.dataset.reviewStock,x.value]))});}if(event.target.matches('[data-inv15-mabang-value]'))updateWarehouse(event.target);});
     page.addEventListener('click', (event) => {
       const reviewRow=event.target.closest('[data-review-row]');
       if(reviewRow){const r=session.results.find(x=>x.row===Number(reviewRow.dataset.reviewRow));if(!r)return;

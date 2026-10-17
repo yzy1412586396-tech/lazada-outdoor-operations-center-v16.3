@@ -65,3 +65,10 @@
 
 /* Only external file drags reveal enlarged receiving areas; no normal layout changes. */
 .inv15-source-card{position:relative}.inv181-drop-hint{display:none;position:absolute;inset:5px;z-index:8;pointer-events:none;align-items:center;justify-content:center;padding:20px;text-align:center;border:2px dashed var(--accent);border-radius:18px;background:color-mix(in srgb,var(--surface) 94%,var(--accent));color:var(--accent);font-size:16px;font-weight:700}.inv181-files-drag .inv181-drop-hint{display:flex}.inv181-files-drag .inv181-drop-target .inv181-drop-hint{border-style:solid;background:color-mix(in srgb,var(--surface) 83%,var(--accent));box-shadow:inset 0 0 0 2px var(--accent)}
+
+/* V18.2: selection changes update checkboxes only, preserving input focus. */
+.inv182-batch{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface2)}
+.inv182-batch[hidden]{display:none}.inv182-batch label{display:flex;align-items:center;gap:8px;cursor:default}.inv182-batch b{font-size:12px;color:var(--accent)}
+.inv182-batch input[type=checkbox],.inv18-review-table input[data-select-review],.inv18-review-table input[data-select-filtered]{width:17px;height:17px;min-width:17px;padding:0;margin:0;accent-color:var(--accent);cursor:pointer}
+.inv18-review-table th:nth-child(1){width:42px}.inv18-review-table th:nth-child(2){width:24%}.inv18-review-table th:nth-child(3){width:22%}.inv18-review-table th:nth-child(4){width:24%}.inv18-review-table th:nth-child(5){width:25%}.inv18-review-table th:last-child{width:52px}
+.inv18-review-table .inv182-selection-cell{text-align:center;padding:17px 10px}.inv182-selected>.inv182-selection-cell{box-shadow:inset 3px 0 var(--accent)}

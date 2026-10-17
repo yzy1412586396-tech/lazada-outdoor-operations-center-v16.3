@@ -12,8 +12,8 @@ const { registerAutomationFolderHandlers } = require('./automation-folders');
 const { NorthstarReadOnlyServer } = require('./northstar-server');
 
 const APP_NAME = 'Lazada户外运营中心';
-const APP_VERSION = '18.1.0';
-const DISPLAY_VERSION = '18.1';
+const APP_VERSION = '18.2.0';
+const DISPLAY_VERSION = '18.2';
 const TRANSPARENT_DRAG_ICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 const isSmokeTest = process.argv.includes('--smoke-test');
 const isRealInventoryTest = process.argv.includes('--real-inventory-test');
@@ -1131,14 +1131,16 @@ function createWindow() {
     frame: !windowsSurface && process.platform === 'darwin',
     titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'default',
     roundedCorners: true,
-    // V18.0: supported native window sizing. Transparent/non-resizable Windows
-    // windows cannot be made reliable by a renderer polling cursor coordinates.
-    transparent: false,
+    // V18.2: Electron 44.5 contains electron/electron#49428: frameless
+    // CanResize() no longer depends on WS_THICKFRAME. Keep native resizing ON;
+    // CSS supplies corner alpha only. Never restore cursor-polling JS sizing.
+    // https://github.com/electron/electron/pull/49428
+    transparent: windowsSurface,
     resizable: true,
     maximizable: true,
-    thickFrame: true,
+    thickFrame: !windowsSurface,
     hasShadow: true,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: windowsSurface ? '#00000000' : '#F1F5F9',
     icon: path.join(__dirname, '..', 'app', 'app-icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -1154,7 +1156,7 @@ function createWindow() {
 
   if (process.platform === 'darwin') win.setWindowButtonVisibility(false);
   const publishWindowState=()=>{if(!win.isDestroyed())win.webContents.send('window:surface-state',{maximized:win.isMaximized()});};
-  win.on('maximize',publishWindowState);win.on('unmaximize',publishWindowState);win.on('restore',publishWindowState);
+  win.on('maximize',publishWindowState);win.on('unmaximize',publishWindowState);win.on('restore',publishWindowState);win.on('resized',publishWindowState);win.on('leave-full-screen',publishWindowState);
   mainWindow = win;
   win.webContents.on('render-process-gone', (_event, details) => {
     console.error('RENDER_PROCESS_GONE:', JSON.stringify(details));

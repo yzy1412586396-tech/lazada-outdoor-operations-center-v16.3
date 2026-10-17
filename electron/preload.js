@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-const APP_VERSION = '18.1.0';
-const DISPLAY_VERSION = '18.1';
+const APP_VERSION = '18.2.0';
+const DISPLAY_VERSION = '18.2';
 const usesWindowsSurface = process.platform === 'win32' || process.argv.includes('--windows-surface');
 let databaseReady = false;
 let lastStorage = new Map();
@@ -302,13 +302,16 @@ function installWindowSurface() {
   if (!usesWindowsSurface) return;
   const surface = document.createElement('div');
   surface.id = 'desktopWindowSurface';
-  // The Windows content wrapper is opaque and fills the native client area.
-  // Page rounding stays inside; no alpha clipping or renderer resize overlays.
+  // Corner alpha is clipped on this single wrapper; dynamic children must stay
+  // inside it so modals/popovers cannot paint a square over the rounded shell.
   const moveIntoSurface = (node) => {
     if (node !== surface && !(node.nodeType === 1 && /^(SCRIPT|STYLE|LINK)$/.test(node.tagName))) surface.appendChild(node);
   };
   [...document.body.childNodes].forEach(moveIntoSurface);
   document.body.appendChild(surface);
+  // Exclude only the native resize border from caption dragging. Chromium's
+  // FramelessView performs HTLEFT/HTTOP/etc; these strips have no JS handlers.
+  for(const edge of ['n','s','e','w']){const border=document.createElement('div');border.className='window-native-border '+edge;border.setAttribute('aria-hidden','true');surface.appendChild(border);}
   const observer = new MutationObserver((changes) => {
     for (const change of changes) for (const node of change.addedNodes) {
       if (node.parentNode === document.body) moveIntoSurface(node);
